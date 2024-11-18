@@ -8,33 +8,52 @@
 
 (def money 0)
 
-(defn printOptions[]
-  (println "Seu saldo atual e" money)
-  (println "1 - Depositar")
-  (println "2 - Sacar")
-  (println "3 - Escolher um evento")
-  (println "0 - Encerrar")
-  (println)
+(defn printOptions[op]
+  (cond
+    (= op 1)
+      (do
+        (println "Seu saldo atual e" money)
+        (println "1 - Depositar")
+        (println "2 - Sacar")
+        (println "3 - Escolher um evento")
+        (println "0 - Encerrar")
+        (println)
+      )
+    (= op 2)
+      (do
+        (println "1 - Futebol")
+        (println "2 - Basquete")
+        (println "0 - Voltar")
+        (println)
+      )
+    :else (println)
+  )
+
 )
 
-(defn validRange[x]
-  (or (= x 0) (= x 1) (= x 2) (= x 3))
+(defn validRange[x op]
+  (cond
+    (= op 1) (or (= x 0) (= x 1) (= x 2) (= x 3)) 
+    (= op 2) (or (= x 0) (= x 1) (= x 2))
+    (= op 3) (println "Selecionou Opcao Errada!")
+    :else (false)
+  )
 )
 
 (defn input
-  ([x]
+  ([x op]
     (cond
-      (not (validRange x))
+      (or (not (validRange x op)))
         (do
-          (println (format "%d e uma opcao invalida\n" x))
-          (printOptions)
-          (input)
+          (println (format "%s e uma opcao invalida\n" x))
+          (printOptions op)
+          (input op)
         )
       :else x
     )
   )
-  ([]
-    (input (read))
+  ([op]
+    (input (read) op)
   )
 )
 
@@ -71,6 +90,14 @@
   )
 )
 
+(defn defineSport[x]
+  (cond 
+    (= x 1) "Futebol"
+    (= x 2) "Basquete"
+    (= x 0) 0
+  )
+)
+
 (defn executeOrder[op]
   (cond
     (= op 1)
@@ -84,14 +111,22 @@
         (withdrawl (readNumber))
       )
     (= op 3)
-    :else
+      (do
+        (printOptions 2)
+        (def sport (defineSport (input 2)))
+        (if 
+          (number? sport) (println "Retornando\n")
+          (println (format "Voce escolheu %s\n" sport))
+        )
+      )
+    :else (println "Encerrando o Programa")
   )
 )
 
 (defn -main
   [& args]
-  (printOptions)
-  (def x (input))
+  (printOptions 1)
+  (def x (input 1))
   (executeOrder x)
   (if (not= x 0) (recur args))
 )
