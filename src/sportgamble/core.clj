@@ -1,4 +1,5 @@
 (ns sportgamble.core
+  (:require [cheshire.core	:refer	:all])
   (:require	[clj-http.client	:as	http-client])
   (:gen-class))
 
@@ -128,5 +129,9 @@
   (printOptions 1)
   (def x (input 1))
   (executeOrder x)
+  (println key)
+  (def teste (parse-string (:body (http-client/get	"https://api.the-odds-api.com/v4/sports/basketball_nba/scores/?apiKey=c525251008cb6c3a48e1722f260dea29"))))
+  (println (get (nth teste 0) "sport_key"))
+  (dorun (map #(println %) teste))
   (if (not= x 0) (recur args))
 )
