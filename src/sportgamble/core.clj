@@ -117,7 +117,7 @@
 )
 
 (defn printGamesFromAPI[gamesFromAPI]
-  (dorun (map #(println (get % "sport_key")) gamesFromAPI))
+  (dorun (map #(println (format "Liga: %s\nData:%s\nJogo: %s vs %s\n" (get % "sport_title") (get % "commence_time") (get % "home_team") (get % "away_team"))) gamesFromAPI))
 )
 
 (defn executeOrder[op]
