@@ -9,6 +9,8 @@
 
 (def money 0)
 
+;; "op" é um parâmetro utilizado para indicar o tipo de menu a ser impresso
+;; 1: Menu Principal. 2: Menu de seleção de esportes
 (defn printOptions[op]
   (cond
     (= op 1)
@@ -32,6 +34,8 @@
 
 )
 
+;; "op" é um parâmetro utilizado para indicar o tipo de validação a ser feita
+;; 1: (0, 3). 2: (0, 2)
 (defn validRange[x op]
   (cond
     (= op 1) (or (= x 0) (= x 1) (= x 2) (= x 3)) 
@@ -41,6 +45,7 @@
   )
 )
 
+;; "op é o parâmetro que irá ser passado para a função de validação"
 (defn input
   ([x op]
     (cond
@@ -99,6 +104,22 @@
   )
 )
 
+(defn translateSportToAPI[sport]
+  (cond
+    (= sport "Futebol") "soccer_epl"
+    (= sport "Basquete") "basketball_nba"
+  )
+)
+
+(defn getGamesFromAPI[sportAPIKey]
+  (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s" api-host sportAPIKey key))
+  (parse-string (:body (http-client/get requisition)))
+)
+
+(defn printGamesFromAPI[gamesFromAPI]
+  (dorun (map #(println (get % "sport_key")) gamesFromAPI))
+)
+
 (defn executeOrder[op]
   (cond
     (= op 1)
@@ -117,7 +138,11 @@
         (def sport (defineSport (input 2)))
         (if 
           (number? sport) (println "Retornando\n")
-          (println (format "Voce escolheu %s\n" sport))
+          (do
+            (println (format "Voce escolheu %s\n" sport))
+            (def sportAPIKey (translateSportToAPI sport))
+            (printGamesFromAPI (getGamesFromAPI sportAPIKey))
+          )
         )
       )
     :else (println "Encerrando o Programa")
@@ -129,9 +154,5 @@
   (printOptions 1)
   (def x (input 1))
   (executeOrder x)
-  (println key)
-  (def teste (parse-string (:body (http-client/get	"https://api.the-odds-api.com/v4/sports/basketball_nba/scores/?apiKey=c525251008cb6c3a48e1722f260dea29"))))
-  (println (get (nth teste 0) "sport_key"))
-  (dorun (map #(println %) teste))
   (if (not= x 0) (recur args))
 )
