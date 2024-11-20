@@ -106,20 +106,20 @@
   )
 )
 
-(defn translateSportToAPI[sport]
-  (cond
-    (= sport "Futebol") "soccer_epl"
-    (= sport "Basquete") "basketball_nba"
-  )
-)
-
 (defn getGamesFromAPI[sportAPIKey]
   (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s" api-host sportAPIKey key))
   (parse-string (:body (http-client/get requisition)))
 )
 
-(defn printGamesFromAPI[gamesFromAPI]
-  (dorun (map #(println (format "Liga: %s\nData:%s\nJogo: %s vs %s\n" (get % "sport_title") (get % "commence_time") (get % "home_team") (get % "away_team"))) gamesFromAPI))
+(def soccerGames (atom (getGamesFromAPI "soccer_epl")))
+(def basketballGames (atom (getGamesFromAPI "basketball_nba")))
+
+(defn getGames[sport]
+  (if (= sport "Futebol") soccerGames basketballGames)
+)
+
+(defn printGames[games]
+  (dorun (map #(println (format "Liga: %s\nData:%s\nJogo: %s vs %s\n" (get % "sport_title") (get % "commence_time") (get % "home_team") (get % "away_team"))) @games))
 )
 
 (defn executeOrder[op]
@@ -141,9 +141,9 @@
         (if 
           (number? sport) (println "Retornando\n")
           (do
-            (println (format "Voce escolheu %s\n" sport))
-            (def sportAPIKey (translateSportToAPI sport))
-            (printGamesFromAPI (getGamesFromAPI sportAPIKey))
+            (println (format "Voce escolheu %s\n" sport))            
+            (printGames (getGames sport))
+            (println (get (nth @(getGames sport) 0) "id"))
           )
         )
       )
