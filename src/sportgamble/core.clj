@@ -1,3 +1,5 @@
+;;Exemplo requisicao odd: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/3544bdfabe61cc6d4389984a5ca83955/odds?apiKey=c525251008cb6c3a48e1722f260dea29&regions=us&markets=h2h&oddsFormat=decimal
+;;Exemplo requisicao eventos: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events?apiKey=c525251008cb6c3a48e1722f260dea29
 (ns sportgamble.core ;;branch jv Branch Levi
   (:require [cheshire.core	:refer	:all])
   (:require	[clj-http.client	:as	http-client])
