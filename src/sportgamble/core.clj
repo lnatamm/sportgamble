@@ -1,4 +1,5 @@
-;;Exemplo requisicao odd: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/3544bdfabe61cc6d4389984a5ca83955/odds?apiKey=c525251008cb6c3a48e1722f260dea29&regions=us&markets=h2h&oddsFormat=decimal
+;;Exemplo requisicao odd individual: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/3544bdfabe61cc6d4389984a5ca83955/odds?apiKey=c525251008cb6c3a48e1722f260dea29&regions=us&markets=h2h&oddsFormat=decimal
+;;Exemplo requisicao odd geral: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?apiKey=c525251008cb6c3a48e1722f260dea29&regions=us&markets=h2h&oddsFormat=decimal
 ;;Exemplo requisicao eventos: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events?apiKey=c525251008cb6c3a48e1722f260dea29
 (ns sportgamble.core ;;branch jv Branch Levi
   (:require [cheshire.core	:refer	:all])
@@ -21,7 +22,7 @@
         (println "Seu saldo atual e" @money)
         (println "1 - Depositar")
         (println "2 - Sacar")
-        (println "3 - Escolher um evento")
+        (println "3 - Apostar em um evento")
         (println "0 - Encerrar")
         (println)
       )
@@ -32,18 +33,24 @@
         (println "0 - Voltar")
         (println)
       )
+    (= op 3)
+      (do
+        (println "1 - h2h (Head to Head/Moneyline)")
+        (println "2 - spreads (Points Handicaps)")
+        (println "3 - totals (Over/Under)")
+        (println "0 - Voltar")
+      )
     :else (println)
   )
-
 )
 
 ;; "op" é um parâmetro utilizado para indicar o tipo de validação a ser feita
 ;; 1: (0, 3). 2: (0, 2)
 (defn validRange[x op]
   (cond
-    (= op 1) (or (= x 0) (= x 1) (= x 2) (= x 3)) 
+    (or (= op 1) (= op 3)) (or (= x 0) (= x 1) (= x 2) (= x 3)) 
     (= op 2) (or (= x 0) (= x 1) (= x 2))
-    (= op 3) (println "Selecionou Opcao Errada!")
+    (= op 4) (println "Selecionou Opcao Errada!")
     :else (false)
   )
 )
@@ -107,32 +114,28 @@
   )
 )
 
-(defn getGamesFromAPI[sportAPIKey]
-  (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s" api-host sportAPIKey key))
+(defn defineMarket[x]
+  (cond
+    (= x 1) "h2h"
+    (= x 2) "spreads"
+    (= x 3) "totals"
+    (= x 0) 0
+  )
+)
+
+(defn translateToSportAPIKey[sport]
+  (if (= sport "Futebol") "soccer_epl" "basketball_nba")
+)
+
+(defn getGamesFromAPI[sportAPIKey market]
+  (def requisition (format "%s/v4/sports/%s/odds?apiKey=%s&regions=us&markets=%s&oddsFormat=decimal" api-host sportAPIKey key market))
   (parse-string (:body (http-client/get requisition)))
 )
 
-;; (defn getGameOddsFromAPI[sportAPIKey id market]
-;;   (def requisition (format "https://api.the-odds-api.com/v4/sports/%s/events/%s/odds?apiKey=%s&regions=us&markets=%s&oddsFormat=decimal" sportAPIKey id key market))
-;;   (parse-string (:body (http-client/get requisition)))
-;; )
-
-(def soccerGames (atom (getGamesFromAPI "soccer_epl")))
-(def basketballGames (atom (getGamesFromAPI "basketball_nba")))
-
-(defn getGames[sport]
-  (if (= sport "Futebol") soccerGames basketballGames)
-)
-
 (defn printGames[games]
+  ;;Aqui também precisamos printar as odds
   (dorun (map #(println (format "Liga: %s\nData:%s\nJogo: %s vs %s\n" (get % "sport_title") (get % "commence_time") (get % "home_team") (get % "away_team"))) @games))
 )
-
-;; (defn printOdds[game]
-;;   (def homeTeam (get game "home_team"))
-;;   (def awayTeam (get game "away_team"))
-;;   (println (format "Jogo: %s vs %s\n%s: %s\n%s: %s\n" homeTeam awayTeam homeTeam awayTeam (get-in game [:bookmarkers :markets :outcomes :price])))
-;; )
 
 (defn executeOrder[op]
   (cond
@@ -147,15 +150,27 @@
         (withdrawl (readNumber))
       )
     (= op 3)
+      ;;Precisamos diminuir o nesting
       (do
-        (printOptions 2)
-        (def sport (defineSport (input 2)))
-        (if 
-          (number? sport) (println "Retornando\n")
+        (println "Escolha um mercado")
+        (printOptions 3)
+        (def market (defineMarket (input 3)))
+        (if
+          (number? market) (println "Retornando\n")
           (do
-            (println (format "Voce escolheu %s\n" sport))            
-            (printGames (getGames sport))
-            (println (get (nth @(getGames sport) 0) "id"))
+            (println (format "Voce escolheu o mercado %s\n" market))
+            (println "Escolha o evento")
+            (printOptions 2)
+            (def sport (defineSport (input 2)))
+            (if 
+              (number? sport) (println "Retornando\n")
+              (do
+                (println (format "Voce escolheu %s\n" sport))
+                (def games (atom (getGamesFromAPI (translateToSportAPIKey sport) market)))            
+                (printGames games)
+                (println (get (nth @games 0) "id"))
+              )
+            )
           )
         )
       )
