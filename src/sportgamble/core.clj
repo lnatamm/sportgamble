@@ -9,15 +9,8 @@
 
 (def api-host "https://api.the-odds-api.com")
 
-(def money 0)
-
-;(def saldo (atom 0))  Átomo de saldo inicializado com 0
-
-;(defn depositar [valor]
-  ;(swap! saldo + valor))  Atualiza o saldo com o valor depositado
-
-;(defn sacar [valor]
-  ;(swap! saldo - valor))  Atualiza o saldo subtraindo o valor sacado
+;Átomo de saldo inicializado com 0
+(def money (atom 0))
 
 ;; "op" é um parâmetro utilizado para indicar o tipo de menu a ser impresso
 ;; 1: Menu Principal. 2: Menu de seleção de esportes
@@ -25,7 +18,7 @@
   (cond
     (= op 1)
       (do
-        (println "Seu saldo atual e" money)
+        (println "Seu saldo atual e" @money)
         (println "1 - Depositar")
         (println "2 - Sacar")
         (println "3 - Escolher um evento")
@@ -91,18 +84,18 @@
 )
 
 (defn deposit[ammount]
-  (def money (+ money ammount))
+  (swap! money + ammount)
 )
 
 (defn withdrawl[ammount]
   (cond
-    (> ammount money)
+    (> ammount @money)
       (do
         (println "Saldo insuficiente, para cancelar a acao digite 0.")
         (println "Insira o valor a ser sacado")
         (withdrawl (readNumber))
       )
-      :else (def money (- money ammount))
+      :else (swap! money - ammount)
   )
 )
 
