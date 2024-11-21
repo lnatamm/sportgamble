@@ -111,6 +111,11 @@
   (parse-string (:body (http-client/get requisition)))
 )
 
+;; (defn getGameOddsFromAPI[sportAPIKey id market]
+;;   (def requisition (format "https://api.the-odds-api.com/v4/sports/%s/events/%s/odds?apiKey=%s&regions=us&markets=%s&oddsFormat=decimal" sportAPIKey id key market))
+;;   (parse-string (:body (http-client/get requisition)))
+;; )
+
 (def soccerGames (atom (getGamesFromAPI "soccer_epl")))
 (def basketballGames (atom (getGamesFromAPI "basketball_nba")))
 
@@ -121,6 +126,12 @@
 (defn printGames[games]
   (dorun (map #(println (format "Liga: %s\nData:%s\nJogo: %s vs %s\n" (get % "sport_title") (get % "commence_time") (get % "home_team") (get % "away_team"))) @games))
 )
+
+;; (defn printOdds[game]
+;;   (def homeTeam (get game "home_team"))
+;;   (def awayTeam (get game "away_team"))
+;;   (println (format "Jogo: %s vs %s\n%s: %s\n%s: %s\n" homeTeam awayTeam homeTeam awayTeam (get-in game [:bookmarkers :markets :outcomes :price])))
+;; )
 
 (defn executeOrder[op]
   (cond
