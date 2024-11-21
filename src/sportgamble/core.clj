@@ -11,6 +11,14 @@
 
 (def money 0)
 
+;(def saldo (atom 0))  Átomo de saldo inicializado com 0
+
+;(defn depositar [valor]
+  ;(swap! saldo + valor))  Atualiza o saldo com o valor depositado
+
+;(defn sacar [valor]
+  ;(swap! saldo - valor))  Atualiza o saldo subtraindo o valor sacado
+
 ;; "op" é um parâmetro utilizado para indicar o tipo de menu a ser impresso
 ;; 1: Menu Principal. 2: Menu de seleção de esportes
 (defn printOptions[op]
