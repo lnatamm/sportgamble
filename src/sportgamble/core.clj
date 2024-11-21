@@ -132,51 +132,72 @@
   (parse-string (:body (http-client/get requisition)))
 )
 
-(defn printGames[games]
-  ;;Aqui também precisamos printar as odds
-  (dorun (map #(println (format "Liga: %s\nData:%s\nJogo: %s vs %s\n" (get % "sport_title") (get % "commence_time") (get % "home_team") (get % "away_team"))) @games))
-)
+(defn printGames [games market]
+  (dorun
+    (map
+      (fn [game]
+        (let [home-team (get game "home_team")
+              away-team (get game "away_team")
+              commence-time (get game "commence_time")
+              bookmakers (get game "bookmakers")
+              draftkings (first (filter #(= "draftkings" (get % "key")) bookmakers)) ;; Filtra o bookmaker "draftkings"
+              markets (get draftkings "markets")]
+          
+          ;; Imprime as informações do jogo
+          (println (format "Liga: %s" (get game "sport_title")))
+          (println (format "Data: %s" commence-time))
+          (println (format "Jogo: %s vs %s" home-team away-team))
+          (println "Odds DraftKings:")
+
+          (dorun
+            (map
+              (fn [market-item] 
+                (let [market-name (get market-item "key")
+                      outcomes (get market-item "outcomes")] 
+                  (when (= market-name market) 
+                    (println (format "Mercado: %s" market-name))
+                    (dorun
+                      (map
+                        (fn [outcome]
+                          (println (format "%s: %s" (get outcome "name") (get outcome "price"))))
+                        outcomes)))))
+              markets))
+
+          (println "-----------------------------------")))
+      games)))
+
+
 
 (defn executeOrder[op]
   (cond
-    (= op 1)
-      (do
-        (println "Insira o valor a ser depositado")
-        (deposit (readNumber))
-      )
-    (= op 2)
-      (do
-        (println "Insira o valor a ser sacado")
-        (withdrawl (readNumber))
-      )
     (= op 3)
-      ;;Precisamos diminuir o nesting
-      (do
-        (println "Escolha um mercado")
-        (printOptions 3)
-        (def market (defineMarket (input 3)))
-        (if
-          (number? market) (println "Retornando\n")
-          (do
-            (println (format "Voce escolheu o mercado %s\n" market))
-            (println "Escolha o evento")
-            (printOptions 2)
-            (def sport (defineSport (input 2)))
-            (if 
-              (number? sport) (println "Retornando\n")
-              (do
-                (println (format "Voce escolheu %s\n" sport))
-                (def games (atom (getGamesFromAPI (translateToSportAPIKey sport) market)))            
-                (printGames games)
-                (println (get (nth @games 0) "id"))
-              )
+    (do
+      (println "Escolha um mercado")
+      (printOptions 3)
+      (def market (defineMarket (input 3)))
+      (if
+        (number? market) (println "Retornando\n")
+        (do
+          (println (format "Voce escolheu o mercado %s\n" market))
+          (println "Escolha o evento")
+          (printOptions 2)
+          (def sport (defineSport (input 2)))
+          (if 
+            (number? sport) (println "Retornando\n")
+            (do
+              (println (format "Voce escolheu %s\n" sport))
+              (def games (atom (getGamesFromAPI (translateToSportAPIKey sport) market)))            
+              (printGames @games market)
+              (println (get (nth @games 0) "id"))
             )
           )
         )
       )
+    )
     :else (println "Encerrando o Programa")
   )
 )
+
 
 (defn -main
   [& args]
