@@ -132,6 +132,27 @@
   (parse-string (:body (http-client/get requisition)))
 )
 
+(def bets (atom []))  ;; Lista de apostas feitas
+
+(defn saveBet [game-id market selected-outcome bet-value odds]
+  (if (<= bet-value @money)  ;; Verifica se o valor da aposta é menor ou igual ao saldo
+    (do
+      ;; Salva a aposta
+      (swap! bets conj {:game-id game-id
+                        :market market
+                        :selected-outcome selected-outcome
+                        :bet-value bet-value
+                        :odds odds
+                        :status "pending"})  ;; Status inicial da aposta como "pendente"
+      
+      ;; Atualiza o saldo, subtraindo o valor da aposta
+      (swap! money - bet-value))
+    (println "Saldo insuficiente para fazer a aposta. Tente um valor menor.")
+  )
+)
+
+;; Fazer função para pegar resultado dos jogos
+
 (defn printGames [games market]
   (dorun
     (map
@@ -170,34 +191,96 @@
 
 (defn executeOrder[op]
   (cond
-    (= op 3)
+    (= op 1) ;; Opção de Depositar
     (do
+      (println "Digite o valor para depositar:")
+      (def amount (readNumber))
+      (deposit amount)
+      (println (format "Deposito de %d realizado com sucesso!" amount))
+    )
+    
+    (= op 2) ;; Opção de Sacar
+    (do
+      (println "Digite o valor para sacar:")
+      (def amount (readNumber))
+      (withdrawl amount)
+      (println (format "Saque de %d realizado com sucesso!" amount))
+    )
+    
+(= op 3)  ;; Opção de Apostar em um evento
+(do
       (println "Escolha um mercado")
-      (printOptions 3)
-      (def market (defineMarket (input 3)))
+      (printOptions 3)  ;; Mostra as opções de mercado de aposta (h2h, spreads, totals)
+      (def market (defineMarket (input 3)))  ;; Lê a escolha do mercado
       (if
-        (number? market) (println "Retornando\n")
+        (number? market) (println "Retornando\n")  ;; Se for número, sai
         (do
           (println (format "Voce escolheu o mercado %s\n" market))
-          (println "Escolha o evento")
-          (printOptions 2)
-          (def sport (defineSport (input 2)))
+          (println "Escolha o evento (digite o numero do evento):")
+          
+          (printOptions 2)  ;; Mostra as opções de esporte (Futebol ou Basquete)
+          (def sport (defineSport (input 2)))  ;; Lê a escolha do esporte
+
           (if 
-            (number? sport) (println "Retornando\n")
+            (number? sport) (println "Retornando\n")  ;; Se for número, sai
             (do
               (println (format "Voce escolheu %s\n" sport))
-              (def games (atom (getGamesFromAPI (translateToSportAPIKey sport) market)))            
-              (printGames @games market)
-              (println (get (nth @games 0) "id"))
+              (def games (atom (getGamesFromAPI (translateToSportAPIKey sport) market)))  ;; Chama a API para pegar os jogos
+              (println "Eventos disponiveis:")
+              (dorun (map-indexed (fn [idx game] 
+                                    (println (str (+ idx 1) " - " 
+                                                  (get game "home_team") " vs " 
+                                                  (get game "away_team") " - Data: " 
+                                                  (get game "commence_time"))))
+                                @games))  ;; Exibe todos os jogos com índice para o usuário escolher
+
+              (println "Digite o numero do evento que deseja apostar:")
+              (def event-choice (read))  ;; O usuário escolhe o evento digitando o número
+              
+              ;; Pega o jogo escolhido baseado no número
+              (def selected-game (nth @games (dec event-choice)))
+              
+              ;; Pega as odds para o mercado
+              (def bookmakers (get selected-game "bookmakers"))
+              (def draftkings (first (filter #(= "draftkings" (get % "key")) bookmakers)))  ;; Filtra o bookmaker "draftkings"
+              (def markets (get draftkings "markets"))
+              
+              ;; Pega as odds para o mercado
+              (def market-odds (first (filter #(= market (get % "key")) markets)))  ;; Filtra pelo mercado
+              (def outcomes (get market-odds "outcomes"))
+              
+              ;; Solicita ao usuário escolher um resultado para apostar
+              (println "Escolha o resultado para apostar:")
+              (doseq [outcome outcomes]  ;; Exibe as opções de resultado
+                (println (str (get outcome "name") " - Odd: " (get outcome "price"))))
+              (println "Digite o numero do resultado que deseja apostar:")
+              (def selected-outcome (read))  ;; Usuário escolhe o resultado
+
+              ;; Encontrar a odd correspondente ao resultado escolhido
+              (def selected-odd (get (nth outcomes (dec selected-outcome)) "price"))
+              
+              ;; Pergunta o valor da aposta
+              (println "Digite o valor da aposta:")
+              (def bet-value (readNumber))  ;; O usuário insere o valor da aposta
+              
+              ;; Salva a aposta
+              (saveBet (:id selected-game) market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd)
+              
+              ;; Verifica se a aposta foi realmente salva
+              (if (<= bet-value @money)  ;; Se o valor da aposta for suficiente e a aposta foi salva
+                (println (format "Aposta de %d realizada no evento '%s vs %s' com a odd %.2f. Seu saldo agora e: %s" bet-value 
+                                 (get selected-game "home_team") (get selected-game "away_team") selected-odd @money))
+                (println "Aposta nao foi realizada devido a saldo insuficiente.")
+              )
             )
           )
         )
-      )
     )
+    
     :else (println "Encerrando o Programa")
   )
 )
-
+)
 
 (defn -main
   [& args]
