@@ -23,6 +23,7 @@
         (println "1 - Depositar")
         (println "2 - Sacar")
         (println "3 - Apostar em um evento")
+        (println "4 - Consultar Apostas")
         (println "0 - Encerrar")
         (println)
       )
@@ -36,8 +37,7 @@
     (= op 3)
       (do
         (println "1 - h2h (Head to Head/Moneyline)")
-        (println "2 - spreads (Points Handicaps)")
-        (println "3 - totals (Over/Under)")
+        (println "2 - totals (Over/Under)")
         (println "0 - Voltar")
       )
     :else (println)
@@ -48,8 +48,8 @@
 ;; 1: (0, 3). 2: (0, 2)
 (defn validRange[x op]
   (cond
-    (or (= op 1) (= op 3)) (or (= x 0) (= x 1) (= x 2) (= x 3)) 
-    (= op 2) (or (= x 0) (= x 1) (= x 2))
+    (= op 1) (or (= x 0) (= x 1) (= x 2) (= x 3) (= x 4)) 
+    (or (= op 2) (= op 3)) (or (= x 0) (= x 1) (= x 2))
     (= op 4) (println "Selecionou Opcao Errada!")
     :else (false)
   )
@@ -117,8 +117,7 @@
 (defn defineMarket[x]
   (cond
     (= x 1) "h2h"
-    (= x 2) "spreads"
-    (= x 3) "totals"
+    (= x 2) "totals"
     (= x 0) 0
   )
 )
@@ -134,22 +133,43 @@
 
 (def bets (atom []))  ;; Lista de apostas feitas
 
-(defn saveBet [game-id market selected-outcome bet-value odds]
+(defn saveBet [game-id market selected-outcome bet-value odds home-team away-team selected-point]
   (if (<= bet-value @money)  ;; Verifica se o valor da aposta é menor ou igual ao saldo
     (do
-      ;; Salva a aposta
+      ;; Salva a aposta incluindo as informações das equipes
       (swap! bets conj {:game-id game-id
                         :market market
                         :selected-outcome selected-outcome
                         :bet-value bet-value
                         :odds odds
+                        :home_team home-team  ;; Adiciona o time da casa
+                        :away_team away-team  ;; Adiciona o time visitante
+                        :selected-point selected-point
                         :status "pending"})  ;; Status inicial da aposta como "pendente"
-      
-      ;; Atualiza o saldo, subtraindo o valor da aposta
-      (swap! money - bet-value))
+      (println "Aposta salva com sucesso!")
+    )
     (println "Saldo insuficiente para fazer a aposta. Tente um valor menor.")
   )
 )
+
+(defn printBets []
+  (doall
+   (map (fn [bet]
+          (let [home-team (:home_team bet)
+                away-team (:away_team bet)
+                market (:market bet)
+                selected-outcome (:selected-outcome bet)
+                selected-point (:selected-point bet)
+                bet-value (:bet-value bet)
+                odds (:odds bet)
+                status (:status bet)]
+            (println (str "Jogo: " home-team " vs " away-team
+                          ", Mercado: " market
+                          ", Resultado Apostado: " (str selected-outcome " " selected-point)
+                          ", Valor Apostado: " bet-value
+                          ", Odds: " odds
+                          ", Status: " status))))
+        @bets)))
 
 ;; Fazer função para pegar resultado dos jogos
 
@@ -168,7 +188,7 @@
           (println (format "Liga: %s" (get game "sport_title")))
           (println (format "Data: %s" commence-time))
           (println (format "Jogo: %s vs %s" home-team away-team))
-          (println "Odds DraftKings:")
+          (println "Odds draftkings:")
 
           (dorun
             (map
@@ -189,7 +209,7 @@
 
 
 
-(defn executeOrder[op]
+(defn executeOrder [op]
   (cond
     (= op 1) ;; Opção de Depositar
     (do
@@ -198,7 +218,7 @@
       (deposit amount)
       (println (format "Deposito de %d realizado com sucesso!" amount))
     )
-    
+
     (= op 2) ;; Opção de Sacar
     (do
       (println "Digite o valor para sacar:")
@@ -207,8 +227,8 @@
       (println (format "Saque de %d realizado com sucesso!" amount))
     )
     
-(= op 3)  ;; Opção de Apostar em um evento
-(do
+    (= op 3) ;; Opção de Apostar em um evento
+    (do
       (println "Escolha um mercado")
       (printOptions 3)  ;; Mostra as opções de mercado de aposta (h2h, spreads, totals)
       (def market (defineMarket (input 3)))  ;; Lê a escolha do mercado
@@ -242,45 +262,80 @@
               
               ;; Pega as odds para o mercado
               (def bookmakers (get selected-game "bookmakers"))
-              (def draftkings (first (filter #(= "draftkings" (get % "key")) bookmakers)))  ;; Filtra o bookmaker "draftkings"
-              (def markets (get draftkings "markets"))
+              
+              ;; Filtro condicional com base no esporte (basquete ou futebol)
+              (def bookmaker-key (if (= sport "Basquete") "draftkings" "bovada"))  ;; "1" pode ser o código para Basquete, por exemplo
+
+              (def bookmaker (first (filter #(= bookmaker-key (get % "key")) bookmakers)))  ;; Filtra pelo bookmaker correto
+              (def markets (get bookmaker "markets"))
               
               ;; Pega as odds para o mercado
               (def market-odds (first (filter #(= market (get % "key")) markets)))  ;; Filtra pelo mercado
               (def outcomes (get market-odds "outcomes"))
               
-              ;; Solicita ao usuário escolher um resultado para apostar
-              (println "Escolha o resultado para apostar:")
-              (doseq [outcome outcomes]  ;; Exibe as opções de resultado
-                (println (str (get outcome "name") " - Odd: " (get outcome "price"))))
-              (println "Digite o numero do resultado que deseja apostar:")
-              (def selected-outcome (read))  ;; Usuário escolhe o resultado
+              ;; Verifica se o mercado é "totals"
+              (if (= market "totals")
+                (do
+                  ;; Exibe as opções de "Over" e "Under" com os pontos e odds
+                  (println "Escolha o resultado para apostar:")
+                  (doall
+                    (map (fn [outcome] 
+                          (println (str (get outcome "name") " " 
+                                        (get outcome "point") " - Odd: " 
+                                        (get outcome "price")))) 
+                        outcomes))
+                  (println "Digite o numero do resultado que deseja apostar:")
+                  (def selected-outcome (read))  ;; Usuário escolhe o resultado
 
-              ;; Encontrar a odd correspondente ao resultado escolhido
-              (def selected-odd (get (nth outcomes (dec selected-outcome)) "price"))
-              
+                  ;; Encontrar a odd correspondente ao resultado escolhido
+                  (def selected-odd (get (nth outcomes (dec selected-outcome)) "price"))
+                  (def selected-point (get (nth outcomes (dec selected-outcome)) "point"))
+                )
+                (do
+                  ;; Caso o mercado não seja "totals", você pode manter o código anterior para "h2h"
+                  (println "Escolha o resultado para apostar:")
+                  (doall
+                    (map (fn [outcome] 
+                          (println (str (get outcome "name") " - Odd: " 
+                                        (get outcome "price")))) 
+                        outcomes))
+                  (println "Digite o numero do resultado que deseja apostar:")
+                  (def selected-outcome (read))  ;; Usuário escolhe o resultado
+
+                  ;; Encontrar a odd correspondente ao resultado escolhido
+                  (def selected-odd (get (nth outcomes (dec selected-outcome)) "price"))
+                  (def selected-point "")
+                )
+              )
               ;; Pergunta o valor da aposta
               (println "Digite o valor da aposta:")
               (def bet-value (readNumber))  ;; O usuário insere o valor da aposta
-              
+               
               ;; Salva a aposta
-              (saveBet (:id selected-game) market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd)
-              
+              (saveBet (:id selected-game) market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd
+                       (get selected-game "home_team") (get selected-game "away_team") selected-point)
+               
               ;; Verifica se a aposta foi realmente salva
-              (if (<= bet-value @money)  ;; Se o valor da aposta for suficiente e a aposta foi salva
-                (println (format "Aposta de %d realizada no evento '%s vs %s' com a odd %.2f. Seu saldo agora e: %s" bet-value 
-                                 (get selected-game "home_team") (get selected-game "away_team") selected-odd @money))
-                (println "Aposta nao foi realizada devido a saldo insuficiente.")
-              )
+              (if (<= bet-value @money)  ;; Verifica se o valor da aposta é suficiente
+                  (do
+                    (println (format "Aposta de %d realizada no evento '%s vs %s' com a odd %.2f." bet-value (get selected-game "home_team") (get selected-game "away_team") selected-odd  ))
+                    (swap! money - bet-value)))
             )
           )
         )
     )
+    )
+    
+    (= op 4) ;; Opção de Ver Apostas
+    (do
+      (println "Exibindo todas as apostas realizadas:")
+      (printBets) ;; Chama a função para imprimir as apostas
+      (println "Fim da visualizacao de apostas."))
+    )
     
     :else (println "Encerrando o Programa")
-  )
 )
-)
+
 
 (defn -main
   [& args]
