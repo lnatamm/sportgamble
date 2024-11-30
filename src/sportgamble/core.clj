@@ -1,6 +1,7 @@
 ;;Exemplo requisicao odd individual: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/3544bdfabe61cc6d4389984a5ca83955/odds?apiKey=c525251008cb6c3a48e1722f260dea29&regions=us&markets=h2h&oddsFormat=decimal
 ;;Exemplo requisicao odd geral: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?apiKey=c525251008cb6c3a48e1722f260dea29&regions=us&markets=h2h&oddsFormat=decimal
 ;;Exemplo requisicao eventos: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events?apiKey=c525251008cb6c3a48e1722f260dea29
+;;Exemplo requisicao score individual: https://api.the-odds-api.com/v4/sports/soccer_epl/scores/?apiKey=c525251008cb6c3a48e1722f260dea29&eventIds=5ccdf1a9875c8417bf996e1a5494e604
 (ns sportgamble.core ;;branch jv Branch Levi
   (:require [cheshire.core	:refer	:all])
   (:require	[clj-http.client	:as	http-client])
@@ -131,9 +132,32 @@
   (parse-string (:body (http-client/get requisition)))
 )
 
+(defn defineWinner [team1 team2]
+  (def team1Score (Integer/parseInt (get team1 "score")))
+  (def team2Score (Integer/parseInt (get team2 "score")))
+  (cond
+    (> team1Score team2Score)
+    (< team1Score team2Score)
+    :else "Draw"
+  )
+)
+
+(defn getGameResultFromAPI[sportAPIKey eventId]
+  (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s&eventIds=%s&daysFrom=3" api-host sportAPIKey key eventId))
+  (def game (nth (parse-string (:body (http-client/get requisition))) 0))
+  (println game)
+  (if 
+    (not (get game "completed")) "incomplete"
+    (do
+      (println "Jogo completado")
+      (defineWinner (nth (get game "scores") 0) (nth (get game "scores") 1))
+    )
+  )
+)
+
 (def bets (atom []))  ;; Lista de apostas feitas
 
-(defn saveBet [game-id market selected-outcome bet-value odds home-team away-team selected-point]
+(defn saveBet [game-id market selected-outcome bet-value odds home-team away-team selected-point sport_key]
   (if (<= bet-value @money)  ;; Verifica se o valor da aposta é menor ou igual ao saldo
     (do
       ;; Salva a aposta incluindo as informações das equipes
@@ -145,6 +169,7 @@
                         :home_team home-team  ;; Adiciona o time da casa
                         :away_team away-team  ;; Adiciona o time visitante
                         :selected-point selected-point
+                        :sport_key sport_key
                         :status "pending"})  ;; Status inicial da aposta como "pendente"
       (println "Aposta salva com sucesso!")
     )
@@ -162,13 +187,15 @@
                 selected-point (:selected-point bet)
                 bet-value (:bet-value bet)
                 odds (:odds bet)
-                status (:status bet)]
+                status (:status bet)
+                sport_key (:sport_key bet)]
             (println (str "Jogo: " home-team " vs " away-team
                           ", Mercado: " market
                           ", Resultado Apostado: " (str selected-outcome " " selected-point)
                           ", Valor Apostado: " bet-value
                           ", Odds: " odds
-                          ", Status: " status))))
+                          ", Status: " status
+                          ", Sport Key: " sport_key))))
         @bets)))
 
 ;; Fazer função para pegar resultado dos jogos
@@ -207,7 +234,31 @@
           (println "-----------------------------------")))
       games)))
 
+(defn checkResult [bet]
+  (println "bet:" bet)
+  (println "sport key:" (:sport_key bet))
+  (println "id:" (:game-id bet))
+  (def sportAPIKey (:sport_key bet))
+  (def eventId (:game-id bet))
+  (def betOutcome (:selected-outcome bet))
+  (def betOdd (Double/parseDouble (:odds bet)))
+  (def winner (getGameResultFromAPI sportAPIKey eventId))
+  (if
+    (not (= winner "incomplete"))
+      (do
+        (if
+          (= winner betOutcome)
+            (do
+              (swap! money * betOdd)
+            )
+        )
+      )
+  )
+)
 
+(defn liquidateBets [bets]
+  (dorun (map checkResult bets))
+)
 
 (defn executeOrder [op]
   (cond
@@ -312,8 +363,8 @@
               (def bet-value (readNumber))  ;; O usuário insere o valor da aposta
                
               ;; Salva a aposta
-              (saveBet (:id selected-game) market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd
-                       (get selected-game "home_team") (get selected-game "away_team") selected-point)
+              (saveBet (get selected-game "id") market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd
+                       (get selected-game "home_team") (get selected-game "away_team") selected-point (get selected-game "sport_key"))
                
               ;; Verifica se a aposta foi realmente salva
               (if (<= bet-value @money)  ;; Verifica se o valor da aposta é suficiente
@@ -323,17 +374,21 @@
             )
           )
         )
-    )
+      )
     )
     
     (= op 4) ;; Opção de Ver Apostas
-    (do
-      (println "Exibindo todas as apostas realizadas:")
-      (printBets) ;; Chama a função para imprimir as apostas
-      (println "Fim da visualizacao de apostas."))
-    )
-    
+      (do
+        (println "Exibindo todas as apostas realizadas:")
+        (printBets) ;; Chama a função para imprimir as apostas
+        ;; (println @bets)
+        ;; (getGameResultFromAPI "soccer_epl" "5ccdf1a9875c8417bf996e1a5494e604")
+        ;; (getGameResultFromAPI "soccer_epl" "88073017de0911f9c9f6636d14e81868")
+        (liquidateBets @bets)
+        (println "Fim da visualizacao de apostas.")
+      )
     :else (println "Encerrando o Programa")
+  )
 )
 
 
