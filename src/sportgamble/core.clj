@@ -234,6 +234,16 @@
           (println "-----------------------------------")))
       games)))
 
+(defn updateBetStatus [game-id]
+  (swap! bets 
+    (fn[bets] 
+      (doall 
+        (map (fn[bet] (if (= (:game-id bet) game-id) (assoc bet :status "completed") bet)) bets)
+      )
+    )
+  )
+)
+
 (defn checkResult [bet]
   (println "bet:" bet)
   (println "sport key:" (:sport_key bet))
@@ -247,6 +257,7 @@
   (if
     (not (= winner "incomplete"))
       (do
+        (updateBetStatus eventId)
         (if
           (= winner betOutcome)
             (do
