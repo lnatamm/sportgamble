@@ -7,7 +7,7 @@
   (:require	[clj-http.client	:as	http-client])
   (:gen-class))
 
-(def key "c525251008cb6c3a48e1722f260dea29")
+(def apiKey "c525251008cb6c3a48e1722f260dea29")
 
 (def api-host "https://api.the-odds-api.com")
 
@@ -128,7 +128,7 @@
 )
 
 (defn getGamesFromAPI[sportAPIKey market]
-  (def requisition (format "%s/v4/sports/%s/odds?apiKey=%s&regions=us&markets=%s&oddsFormat=decimal" api-host sportAPIKey key market))
+  (def requisition (format "%s/v4/sports/%s/odds?apiKey=%s&regions=us&markets=%s&oddsFormat=decimal" api-host sportAPIKey apiKey market))
   (parse-string (:body (http-client/get requisition)))
 )
 
@@ -143,7 +143,7 @@
 )
 
 (defn getGameResultFromAPI[sportAPIKey eventId]
-  (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s&eventIds=%s&daysFrom=3" api-host sportAPIKey key eventId))
+  (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s&eventIds=%s&daysFrom=3" api-host sportAPIKey apiKey eventId))
   (def game (nth (parse-string (:body (http-client/get requisition))) 0))
   (println game)
   (if 
