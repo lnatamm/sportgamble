@@ -241,7 +241,8 @@
   (def sportAPIKey (:sport_key bet))
   (def eventId (:game-id bet))
   (def betOutcome (:selected-outcome bet))
-  (def betOdd (Double/parseDouble (:odds bet)))
+  (def betOdd (:odds bet))
+  (def betValue (:bet-value bet))
   (def winner (getGameResultFromAPI sportAPIKey eventId))
   (if
     (not (= winner "incomplete"))
@@ -249,7 +250,7 @@
         (if
           (= winner betOutcome)
             (do
-              (swap! money * betOdd)
+              (swap! money + (* betOdd betValue))
             )
         )
       )
