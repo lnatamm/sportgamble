@@ -1,16 +1,14 @@
-;;Exemplo requisicao odd individual: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/3544bdfabe61cc6d4389984a5ca83955/odds?apiKey=c525251008cb6c3a48e1722f260dea29&regions=us&markets=h2h&oddsFormat=decimal
-;;Exemplo requisicao odd geral: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?apiKey=c525251008cb6c3a48e1722f260dea29&regions=us&markets=h2h&oddsFormat=decimal
-;;Exemplo requisicao eventos: https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events?apiKey=c525251008cb6c3a48e1722f260dea29
-;;Exemplo requisicao score individual: https://api.the-odds-api.com/v4/sports/soccer_epl/scores/?apiKey=c525251008cb6c3a48e1722f260dea29&eventIds=5ccdf1a9875c8417bf996e1a5494e604
-(ns sportgamble.core ;;branch jv Branch Levi
+(ns sportgamble.core
   (:require [cheshire.core	:refer	:all])
   (:require	[clj-http.client	:as	http-client])
   (:gen-class))
 
 (def apiKey "5e0435f806adc6fa0734d7f1581d9d73")
 
-
 (def api-host "https://api.the-odds-api.com")
+
+(def soccer "soccer_epl")
+(def basketball "basketball_nba")
 
 ;Átomo de saldo inicializado com 0
 (def money (atom 0))
@@ -75,6 +73,7 @@
   )
 )
 
+;;Lê uma entrada até receber um número
 (defn readNumber
   ([x]
     (cond 
@@ -124,15 +123,18 @@
   )
 )
 
+;;Traduz o nome do esporte para sua respectiva chave na API
 (defn translateToSportAPIKey[sport]
-  (if (= sport "Futebol") "soccer_epl" "basketball_nba")
+  (if (= sport "Futebol") soccer basketball)
 )
 
+;;Retorna todos os jogos de um determinado esporte e mercado
 (defn getGamesFromAPI[sportAPIKey market]
   (def requisition (format "%s/v4/sports/%s/odds?apiKey=%s&regions=us&markets=%s&oddsFormat=decimal" api-host sportAPIKey apiKey market))
   (parse-string (:body (http-client/get requisition)))
 )
 
+;;Define o vencedor entre 2 times
 (defn defineWinner [team1 team2]
   (def team1Score (Integer/parseInt (get team1 "score")))
   (def team2Score (Integer/parseInt (get team2 "score")))
@@ -143,6 +145,7 @@
   )
 )
 
+;;Retorna o resultado de um jogo caso o mesmo esteja completo
 (defn getGameResultFromAPI[sportAPIKey eventId]
   (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s&eventIds=%s&daysFrom=3" api-host sportAPIKey apiKey eventId))
   (def game (nth (parse-string (:body (http-client/get requisition))) 0))
@@ -156,6 +159,7 @@
 
 (def bets (atom []))  ;; Lista de apostas feitas
 
+;;Função para salvar uma aposta no átomo
 (defn saveBet [game-id market selected-outcome bet-value odds home-team away-team selected-point sport_key]
   (if (<= bet-value @money)  ;; Verifica se o valor da aposta é menor ou igual ao saldo
     (do
@@ -176,10 +180,12 @@
   )
 )
 
+;;Retorna o tipo de esporte pela chave da API
 (defn getSport[sport_key]
-  (if (= sport_key "soccer_epl") "Futebol" "Basquete")
+  (if (= sport_key soccer) "Futebol" "Basquete")
 )
 
+;;Printa todas as apostas
 (defn printBets []
   (doall
    (map (fn [bet]
@@ -201,6 +207,7 @@
                           ", Status: " status))))
         @bets)))
 
+;;Printa todos os jogos 
 (defn printGames [games market]
   (dorun
     (map
@@ -235,6 +242,7 @@
           (println "-----------------------------------")))
       games)))
 
+;;Atualiza o status da bet
 (defn updateBetStatus [game-id status]
   (swap! bets 
     (fn[bets] 
@@ -245,6 +253,7 @@
   )
 )
 
+;;Função que é chamada para cada bet quando o usuário consulta suas apostas
 (defn checkResult [bet]
   (def sportAPIKey (:sport_key bet))
   (def eventId (:game-id bet))
@@ -296,6 +305,7 @@
             )
 )
 
+;;Liquida as apostas
 (defn liquidateBets [bets]
   (dorun (map checkResult bets))
 )
@@ -423,10 +433,6 @@
       (do
         (println "Exibindo todas as apostas realizadas:")
         (liquidateBets @bets)
-        ;(print game)
-        ;(print (get (nth (get game "scores") 0) "score"))
-        ;(print (get (nth (get game "scores") 1) "score"))
-        ;(print @bets)
         (printBets) ;; Chama a função para imprimir as apostas
         (println "Fim da visualizacao de apostas.")
       )
