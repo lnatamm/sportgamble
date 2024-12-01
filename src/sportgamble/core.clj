@@ -8,6 +8,8 @@
   (:gen-class))
 
 (def apiKey "c525251008cb6c3a48e1722f260dea29")
+(def key "5e0435f806adc6fa0734d7f1581d9d73")
+
 
 (def api-host "https://api.the-odds-api.com")
 
@@ -136,8 +138,8 @@
   (def team1Score (Integer/parseInt (get team1 "score")))
   (def team2Score (Integer/parseInt (get team2 "score")))
   (cond
-    (> team1Score team2Score)
-    (< team1Score team2Score)
+    (> team1Score team2Score) (get team1 "name")
+    (< team1Score team2Score) (get team2 "name")
     :else "Draw"
   )
 )
@@ -145,7 +147,6 @@
 (defn getGameResultFromAPI[sportAPIKey eventId]
   (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s&eventIds=%s&daysFrom=3" api-host sportAPIKey apiKey eventId))
   (def game (nth (parse-string (:body (http-client/get requisition))) 0))
-  (println game)
   (if 
     (not (get game "completed")) "incomplete"
     (do
@@ -177,6 +178,9 @@
   )
 )
 
+(defn removeBet [game-id]
+  (swap! bets (fn [bets] (filter #(not= (:game-id %) game-id) bets))))
+
 (defn printBets []
   (doall
    (map (fn [bet]
@@ -197,8 +201,6 @@
                           ", Status: " status
                           ", Sport Key: " sport_key))))
         @bets)))
-
-;; Fazer função para pegar resultado dos jogos
 
 (defn printGames [games market]
   (dorun
@@ -245,27 +247,39 @@
 )
 
 (defn checkResult [bet]
-  (println "bet:" bet)
-  (println "sport key:" (:sport_key bet))
-  (println "id:" (:game-id bet))
   (def sportAPIKey (:sport_key bet))
   (def eventId (:game-id bet))
   (def betOutcome (:selected-outcome bet))
   (def betOdd (:odds bet))
   (def betValue (:bet-value bet))
+  (def market (:market bet))
   (def winner (getGameResultFromAPI sportAPIKey eventId))
-  (if
-    (not (= winner "incomplete"))
+  (def selectedPoint (:selected-point bet))
+    (if (not (= winner "incomplete"))
       (do
+        (def team1Score (Integer/parseInt (get (nth (get game "scores") 0) "score")))
+        (def team2Score (Integer/parseInt (get (nth (get game "scores") 1) "score")))
+        (def totals (+ team1Score team2Score))
         (updateBetStatus eventId)
-        (if
-          (= winner betOutcome)
+        (cond
+          (= market "h2h") 
+          (if (= winner betOutcome)
             (do
-              (swap! money + (* betOdd betValue))
+              (println "Aposta vencedora no mercado h2h!")
+              (swap! money + (* betOdd betValue))))
+          (= market "totals")
+          (cond
+            (= betOutcome "Over")
+            (if (> totals selectedPoint)
+              (do
+                (println "Aposta vencedora no mercado totals (Over)!")
+                (swap! money + (* betOdd betValue))))
+            (= betOutcome "Under")
+            (if (< totals selectedPoint)
+              (do
+                (println "Aposta vencedora no mercado totals (Under)!")
+                (swap! money + (* betOdd betValue))))))(removeBet eventId))
             )
-        )
-      )
-  )
 )
 
 (defn liquidateBets [bets]
@@ -392,11 +406,12 @@
     (= op 4) ;; Opção de Ver Apostas
       (do
         (println "Exibindo todas as apostas realizadas:")
-        (printBets) ;; Chama a função para imprimir as apostas
-        ;; (println @bets)
-        ;; (getGameResultFromAPI "soccer_epl" "5ccdf1a9875c8417bf996e1a5494e604")
-        ;; (getGameResultFromAPI "soccer_epl" "88073017de0911f9c9f6636d14e81868")
         (liquidateBets @bets)
+        ;(print game)
+        ;(print (get (nth (get game "scores") 0) "score"))
+        ;(print (get (nth (get game "scores") 1) "score"))
+        ;(print @bets)
+        (printBets) ;; Chama a função para imprimir as apostas
         (println "Fim da visualizacao de apostas.")
       )
     :else (println "Encerrando o Programa")
