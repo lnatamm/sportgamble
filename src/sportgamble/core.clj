@@ -197,8 +197,6 @@
                           ", Sport Key: " sport_key))))
         @bets)))
 
-;; Fazer função para pegar resultado dos jogos
-
 (defn printGames [games market]
   (dorun
     (map
