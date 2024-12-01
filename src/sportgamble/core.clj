@@ -7,8 +7,7 @@
   (:require	[clj-http.client	:as	http-client])
   (:gen-class))
 
-(def apiKey "c525251008cb6c3a48e1722f260dea29")
-(def key "5e0435f806adc6fa0734d7f1581d9d73")
+(def apiKey "5e0435f806adc6fa0734d7f1581d9d73")
 
 
 (def api-host "https://api.the-odds-api.com")
@@ -178,9 +177,6 @@
   )
 )
 
-(defn removeBet [game-id]
-  (swap! bets (fn [bets] (filter #(not= (:game-id %) game-id) bets))))
-
 (defn printBets []
   (doall
    (map (fn [bet]
@@ -236,11 +232,11 @@
           (println "-----------------------------------")))
       games)))
 
-(defn updateBetStatus [game-id]
+(defn updateBetStatus [game-id status]
   (swap! bets 
     (fn[bets] 
       (doall 
-        (map (fn[bet] (if (= (:game-id bet) game-id) (assoc bet :status "completed") bet)) bets)
+        (map (fn[bet] (if (= (:game-id bet) game-id) (assoc bet :status status) bet)) bets)
       )
     )
   )
@@ -252,10 +248,11 @@
   (def betOutcome (:selected-outcome bet))
   (def betOdd (:odds bet))
   (def betValue (:bet-value bet))
+  (def betStatus (:status bet))
   (def market (:market bet))
   (def winner (getGameResultFromAPI sportAPIKey eventId))
   (def selectedPoint (:selected-point bet))
-    (if (not (= winner "incomplete"))
+    (if (and (not (= winner "incomplete")) (= betStatus "pending"))
       (do
         (def team1Score (Integer/parseInt (get (nth (get game "scores") 0) "score")))
         (def team2Score (Integer/parseInt (get (nth (get game "scores") 1) "score")))
@@ -263,22 +260,37 @@
         (updateBetStatus eventId)
         (cond
           (= market "h2h") 
-          (if (= winner betOutcome)
-            (do
-              (println "Aposta vencedora no mercado h2h!")
-              (swap! money + (* betOdd betValue))))
+          (if 
+            (= winner betOutcome)
+              (do
+                (println "Aposta vencedora no mercado h2h!")
+                (updateBetStatus eventId "ganhou")
+                (swap! money + (* betOdd betValue))
+              )
+            (updateBetStatus eventId "perdeu")
+          )
           (= market "totals")
           (cond
             (= betOutcome "Over")
-            (if (> totals selectedPoint)
-              (do
-                (println "Aposta vencedora no mercado totals (Over)!")
-                (swap! money + (* betOdd betValue))))
+            (if
+              (> totals selectedPoint)
+                (do
+                  (println "Aposta vencedora no mercado totals (Over)!")
+                  (updateBetStatus eventId "ganhou")
+                  (swap! money + (* betOdd betValue))
+                )
+              (updateBetStatus eventId "perdeu")
+            )
             (= betOutcome "Under")
-            (if (< totals selectedPoint)
-              (do
-                (println "Aposta vencedora no mercado totals (Under)!")
-                (swap! money + (* betOdd betValue))))))(removeBet eventId))
+            (if 
+              (< totals selectedPoint)
+                (do
+                  (println "Aposta vencedora no mercado totals (Under)!")
+                  (updateBetStatus eventId "ganhou")
+                  (swap! money + (* betOdd betValue))
+                )
+              (updateBetStatus eventId "perdeu")
+            ))))
             )
 )
 
