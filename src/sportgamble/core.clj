@@ -149,7 +149,6 @@
   (if 
     (not (get game "completed")) "incomplete"
     (do
-      (println "Jogo completado")
       (defineWinner (nth (get game "scores") 0) (nth (get game "scores") 1))
     )
   )
@@ -170,11 +169,15 @@
                         :away_team away-team  ;; Adiciona o time visitante
                         :selected-point selected-point
                         :sport_key sport_key
-                        :status "pending"})  ;; Status inicial da aposta como "pendente"
+                        :status "Pendente"})  ;; Status inicial da aposta como "pendente"
       (println "Aposta salva com sucesso!")
     )
     (println "Saldo insuficiente para fazer a aposta. Tente um valor menor.")
   )
+)
+
+(defn getSport[sport_key]
+  (if (= sport_key "soccer_epl") "Futebol" "Basquete")
 )
 
 (defn printBets []
@@ -188,14 +191,14 @@
                 bet-value (:bet-value bet)
                 odds (:odds bet)
                 status (:status bet)
-                sport_key (:sport_key bet)]
+                sport_key (getSport (:sport_key bet))]
             (println (str "Jogo: " home-team " vs " away-team
+                          ", Esporte: " sport_key
                           ", Mercado: " market
                           ", Resultado Apostado: " (str selected-outcome " " selected-point)
                           ", Valor Apostado: " bet-value
                           ", Odds: " odds
-                          ", Status: " status
-                          ", Sport Key: " sport_key))))
+                          ", Status: " status))))
         @bets)))
 
 (defn printGames [games market]
@@ -252,7 +255,7 @@
   (def market (:market bet))
   (def winner (getGameResultFromAPI sportAPIKey eventId))
   (def selectedPoint (:selected-point bet))
-    (if (and (not (= winner "incomplete")) (= betStatus "pending"))
+    (if (and (not (= winner "incomplete")) (= betStatus "Pendente"))
       (do
         (def team1Score (Integer/parseInt (get (nth (get game "scores") 0) "score")))
         (def team2Score (Integer/parseInt (get (nth (get game "scores") 1) "score")))
@@ -263,10 +266,10 @@
             (= winner betOutcome)
               (do
                 (println "Aposta vencedora no mercado h2h!")
-                (updateBetStatus eventId "ganhou")
+                (updateBetStatus eventId "Ganhou")
                 (swap! money + (* betOdd betValue))
               )
-            (updateBetStatus eventId "perdeu")
+            (updateBetStatus eventId "Perdeu")
           )
           (= market "totals")
           (cond
@@ -275,20 +278,20 @@
               (> totals selectedPoint)
                 (do
                   (println "Aposta vencedora no mercado totals (Over)!")
-                  (updateBetStatus eventId "ganhou")
+                  (updateBetStatus eventId "Ganhou")
                   (swap! money + (* betOdd betValue))
                 )
-              (updateBetStatus eventId "perdeu")
+              (updateBetStatus eventId "Perdeu")
             )
             (= betOutcome "Under")
             (if 
               (< totals selectedPoint)
                 (do
                   (println "Aposta vencedora no mercado totals (Under)!")
-                  (updateBetStatus eventId "ganhou")
+                  (updateBetStatus eventId "Ganhou")
                   (swap! money + (* betOdd betValue))
                 )
-              (updateBetStatus eventId "perdeu")
+              (updateBetStatus eventId "Perdeu")
             ))))
             )
 )
@@ -367,8 +370,9 @@
                   ;; Exibe as opções de "Over" e "Under" com os pontos e odds
                   (println "Escolha o resultado para apostar:")
                   (doall
-                    (map (fn [outcome] 
-                          (println (str (get outcome "name") " " 
+                    (map-indexed (fn [idx outcome] 
+                          (println (str (+ idx 1) " - "
+                                        (get outcome "name") " " 
                                         (get outcome "point") " - Odd: " 
                                         (get outcome "price")))) 
                         outcomes))
@@ -383,8 +387,9 @@
                   ;; Caso o mercado não seja "totals", você pode manter o código anterior para "h2h"
                   (println "Escolha o resultado para apostar:")
                   (doall
-                    (map (fn [outcome] 
-                          (println (str (get outcome "name") " - Odd: " 
+                    (map-indexed (fn [idx outcome] 
+                          (println (str (+ idx 1) " - "
+                                        (get outcome "name") " - Odd: " 
                                         (get outcome "price")))) 
                         outcomes))
                   (println "Digite o numero do resultado que deseja apostar:")
