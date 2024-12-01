@@ -176,6 +176,9 @@
   )
 )
 
+(defn removeBet [game-id]
+  (swap! bets (fn [bets] (filter #(not= (:game-id %) game-id) bets))))
+
 (defn printBets []
   (doall
    (map (fn [bet]
@@ -249,12 +252,12 @@
   (def betValue (:bet-value bet))
   (def market (:market bet))
   (def winner (getGameResultFromAPI sportAPIKey eventId))
+  (def selectedPoint (:selected-point bet))
     (if (not (= winner "incomplete"))
       (do
         (def team1Score (Integer/parseInt (get (nth (get game "scores") 0) "score")))
         (def team2Score (Integer/parseInt (get (nth (get game "scores") 1) "score")))
         (def totals (+ team1Score team2Score))
-        (def selectedPoint (Integer/parseInt(:selected-point bet)))
         (updateBetStatus eventId)
         (cond
           (= market "h2h") 
@@ -273,7 +276,8 @@
             (if (< totals selectedPoint)
               (do
                 (println "Aposta vencedora no mercado totals (Under)!")
-                (swap! money + (* betOdd betValue))))))))
+                (swap! money + (* betOdd betValue))))))(removeBet eventId))
+            )
 )
 
 (defn liquidateBets [bets]
@@ -402,6 +406,8 @@
         (println "Exibindo todas as apostas realizadas:")
         (liquidateBets @bets)
         ;(print game)
+        ;(print (get (nth (get game "scores") 0) "score"))
+        ;(print (get (nth (get game "scores") 1) "score"))
         ;(print @bets)
         (printBets) ;; Chama a função para imprimir as apostas
         (println "Fim da visualizacao de apostas.")
