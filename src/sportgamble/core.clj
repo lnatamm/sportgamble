@@ -257,7 +257,6 @@
         (def team1Score (Integer/parseInt (get (nth (get game "scores") 0) "score")))
         (def team2Score (Integer/parseInt (get (nth (get game "scores") 1) "score")))
         (def totals (+ team1Score team2Score))
-        (updateBetStatus eventId)
         (cond
           (= market "h2h") 
           (if 
