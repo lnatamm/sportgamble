@@ -3,15 +3,29 @@
   (:require	[clj-http.client	:as	http-client])
   (:gen-class))
 
-(def apiKey "5e0435f806adc6fa0734d7f1581d9d73")
-
-(def api-host "https://api.the-odds-api.com")
-
-(def soccer "soccer_epl")
+(def soccer "americanfootball_nfl")
 (def basketball "basketball_nba")
+(def api-host "http://localhost:3000")
 
-;Átomo de saldo inicializado com 0
-(def money (atom 0))
+;; (defn as-json [content]
+;;   {:headers {"Content-Type" "application/json; charset=utf-8"}
+;;    :body (json/generate-string content)})
+
+(defn getBalance[]
+  (Integer/parseInt(:body (http-client/get (str api-host "/saldo"))))
+)
+
+(defn getBets[]
+  (:body (http-client/get (str api-host "/apostas")))
+)
+
+(defn getGames[sportAPIKey]
+    (:body (http-client/get (str api-host "/eventos?sportAPIKey=" sportAPIKey))) 
+)
+
+(defn getTotals[sportAPIKey]
+  (:body (http-client/get (str api-host "/totals?sportAPIKey=" sportAPIKey)))
+)
 
 ;; "op" é um parâmetro utilizado para indicar o tipo de menu a ser impresso
 ;; 1: Menu Principal. 2: Menu de seleção de esportes
@@ -19,11 +33,12 @@
   (cond
     (= op 1)
       (do
-        (println "Seu saldo atual e" @money)
+        (println "Seu saldo atual e" (getBalance))
         (println "1 - Depositar")
         (println "2 - Sacar")
-        (println "3 - Apostar em um evento")
-        (println "4 - Consultar Apostas")
+        (println "3 - Consultar Eventos")
+        (println "4 - Realizar uma Aposta")
+        (println "5 - Consultar Apostas")
         (println "0 - Encerrar")
         (println)
       )
@@ -48,7 +63,7 @@
 ;; 1: (0, 3). 2: (0, 2)
 (defn validRange[x op]
   (cond
-    (= op 1) (or (= x 0) (= x 1) (= x 2) (= x 3) (= x 4)) 
+    (= op 1) (or (= x 0) (= x 1) (= x 2) (= x 3) (= x 4) (= x 5)) 
     (or (= op 2) (= op 3)) (or (= x 0) (= x 1) (= x 2))
     (= op 4) (println "Selecionou Opcao Errada!")
     :else (false)
@@ -91,22 +106,6 @@
   )
 )
 
-(defn deposit[ammount]
-  (swap! money + ammount)
-)
-
-(defn withdrawl[ammount]
-  (cond
-    (> ammount @money)
-      (do
-        (println "Saldo insuficiente, para cancelar a acao digite 0.")
-        (println "Insira o valor a ser sacado")
-        (withdrawl (readNumber))
-      )
-      :else (swap! money - ammount)
-  )
-)
-
 (defn defineSport[x]
   (cond 
     (= x 1) "Futebol"
@@ -128,58 +127,6 @@
   (if (= sport "Futebol") soccer basketball)
 )
 
-;;Retorna todos os jogos de um determinado esporte e mercado
-(defn getGamesFromAPI[sportAPIKey market]
-  (def requisition (format "%s/v4/sports/%s/odds?apiKey=%s&regions=us&markets=%s&oddsFormat=decimal" api-host sportAPIKey apiKey market))
-  (parse-string (:body (http-client/get requisition)))
-)
-
-;;Define o vencedor entre 2 times
-(defn defineWinner [team1 team2]
-  (def team1Score (Integer/parseInt (get team1 "score")))
-  (def team2Score (Integer/parseInt (get team2 "score")))
-  (cond
-    (> team1Score team2Score) (get team1 "name")
-    (< team1Score team2Score) (get team2 "name")
-    :else "Draw"
-  )
-)
-
-;;Retorna o resultado de um jogo caso o mesmo esteja completo
-(defn getGameResultFromAPI[sportAPIKey eventId]
-  (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s&eventIds=%s&daysFrom=3" api-host sportAPIKey apiKey eventId))
-  (def game (nth (parse-string (:body (http-client/get requisition))) 0))
-  (if 
-    (not (get game "completed")) "incomplete"
-    (do
-      (defineWinner (nth (get game "scores") 0) (nth (get game "scores") 1))
-    )
-  )
-)
-
-(def bets (atom []))  ;; Lista de apostas feitas
-
-;;Função para salvar uma aposta no átomo
-(defn saveBet [game-id market selected-outcome bet-value odds home-team away-team selected-point sport_key]
-  (if (<= bet-value @money)  ;; Verifica se o valor da aposta é menor ou igual ao saldo
-    (do
-      ;; Salva a aposta incluindo as informações das equipes
-      (swap! bets conj {:game-id game-id
-                        :market market
-                        :selected-outcome selected-outcome
-                        :bet-value bet-value
-                        :odds odds
-                        :home_team home-team  ;; Adiciona o time da casa
-                        :away_team away-team  ;; Adiciona o time visitante
-                        :selected-point selected-point
-                        :sport_key sport_key
-                        :status "Pendente"})  ;; Status inicial da aposta como "pendente"
-      (println "Aposta salva com sucesso!")
-    )
-    (println "Saldo insuficiente para fazer a aposta. Tente um valor menor.")
-  )
-)
-
 ;;Retorna o tipo de esporte pela chave da API
 (defn getSport[sport_key]
   (if (= sport_key soccer) "Futebol" "Basquete")
@@ -187,17 +134,18 @@
 
 ;;Printa todas as apostas
 (defn printBets []
+  (def bets (parse-string (getBets)))
   (doall
    (map (fn [bet]
-          (let [home-team (:home_team bet)
-                away-team (:away_team bet)
-                market (:market bet)
-                selected-outcome (:selected-outcome bet)
-                selected-point (:selected-point bet)
-                bet-value (:bet-value bet)
-                odds (:odds bet)
-                status (:status bet)
-                sport_key (getSport (:sport_key bet))]
+          (let [home-team (get bet "home_team")
+                away-team (get bet "away_team")
+                market (get bet "market")
+                selected-outcome (get bet "selected-outcome")
+                selected-point (get bet "selected-point")
+                bet-value (get bet "bet-value")
+                odds (get bet "odds")
+                status (get bet "status")
+                sport_key (getSport (get bet "sport-key"))]
             (println (str "Jogo: " home-team " vs " away-team
                           ", Esporte: " sport_key
                           ", Mercado: " market
@@ -205,109 +153,29 @@
                           ", Valor Apostado: " bet-value
                           ", Odds: " odds
                           ", Status: " status))))
-        @bets)))
+        bets)))
 
-;;Printa todos os jogos 
-(defn printGames [games market]
-  (dorun
-    (map
-      (fn [game]
-        (let [home-team (get game "home_team")
-              away-team (get game "away_team")
-              commence-time (get game "commence_time")
-              bookmakers (get game "bookmakers")
-              draftkings (first (filter #(= "draftkings" (get % "key")) bookmakers)) ;; Filtra o bookmaker "draftkings"
-              markets (get draftkings "markets")]
-          
-          ;; Imprime as informações do jogo
-          (println (format "Liga: %s" (get game "sport_title")))
-          (println (format "Data: %s" commence-time))
-          (println (format "Jogo: %s vs %s" home-team away-team))
-          (println "Odds draftkings:")
+(defn deposit[amount]
+  (http-client/post  (str api-host "/transacoes") {:form-params {:value amount} :content-type :json})
+)
 
-          (dorun
-            (map
-              (fn [market-item] 
-                (let [market-name (get market-item "key")
-                      outcomes (get market-item "outcomes")] 
-                  (when (= market-name market) 
-                    (println (format "Mercado: %s" market-name))
-                    (dorun
-                      (map
-                        (fn [outcome]
-                          (println (format "%s: %s" (get outcome "name") (get outcome "price"))))
-                        outcomes)))))
-              markets))
-
-          (println "-----------------------------------")))
-      games)))
-
-;;Atualiza o status da bet
-(defn updateBetStatus [game-id status]
-  (swap! bets 
-    (fn[bets] 
-      (doall 
-        (map (fn[bet] (if (= (:game-id bet) game-id) (assoc bet :status status) bet)) bets)
-      )
-    )
+(defn postBet[game-id market selected-outcome bet-value odds home-team away-team selected-point sport-key]
+  (http-client/post  (str api-host "/apostas") 
+    {:form-params {:game-id game-id :market market :selected-outcome selected-outcome :bet-value bet-value :odds odds :home-team home-team :away-team away-team :selected-point selected-point :sport-key sport-key} 
+    :content-type :json}
   )
 )
 
-;;Função que é chamada para cada bet quando o usuário consulta suas apostas
-(defn checkResult [bet]
-  (def sportAPIKey (:sport_key bet))
-  (def eventId (:game-id bet))
-  (def betOutcome (:selected-outcome bet))
-  (def betOdd (:odds bet))
-  (def betValue (:bet-value bet))
-  (def betStatus (:status bet))
-  (def market (:market bet))
-  (def winner (getGameResultFromAPI sportAPIKey eventId))
-  (def selectedPoint (:selected-point bet))
-    (if (and (not (= winner "incomplete")) (= betStatus "Pendente"))
+(defn withdrawl[amount]
+  (cond
+    (> amount (getBalance))
       (do
-        (def team1Score (Integer/parseInt (get (nth (get game "scores") 0) "score")))
-        (def team2Score (Integer/parseInt (get (nth (get game "scores") 1) "score")))
-        (def totals (+ team1Score team2Score))
-        (cond
-          (= market "h2h") 
-          (if 
-            (= winner betOutcome)
-              (do
-                (println "Aposta vencedora no mercado h2h!")
-                (updateBetStatus eventId "Ganhou")
-                (swap! money + (* betOdd betValue))
-              )
-            (updateBetStatus eventId "Perdeu")
-          )
-          (= market "totals")
-          (cond
-            (= betOutcome "Over")
-            (if
-              (> totals selectedPoint)
-                (do
-                  (println "Aposta vencedora no mercado totals (Over)!")
-                  (updateBetStatus eventId "Ganhou")
-                  (swap! money + (* betOdd betValue))
-                )
-              (updateBetStatus eventId "Perdeu")
-            )
-            (= betOutcome "Under")
-            (if 
-              (< totals selectedPoint)
-                (do
-                  (println "Aposta vencedora no mercado totals (Under)!")
-                  (updateBetStatus eventId "Ganhou")
-                  (swap! money + (* betOdd betValue))
-                )
-              (updateBetStatus eventId "Perdeu")
-            ))))
-            )
-)
-
-;;Liquida as apostas
-(defn liquidateBets [bets]
-  (dorun (map checkResult bets))
+        (println "Saldo insuficiente, para cancelar a acao digite 0.")
+        (println "Insira o valor a ser sacado")
+        (withdrawl (readNumber))
+      )
+    :else (do (http-client/post  (str api-host "/transacoes") {:form-params {:value (* -1 amount)} :content-type :json}) (println (format "Saque de %d realizado com sucesso!" amount)))
+  )
 )
 
 (defn executeOrder [op]
@@ -325,48 +193,63 @@
       (println "Digite o valor para sacar:")
       (def amount (readNumber))
       (withdrawl amount)
-      (println (format "Saque de %d realizado com sucesso!" amount))
+    )
+
+    (= op 3)
+    (do
+      (println "Digite o esporte")
+      (printOptions 2)
+      (def sportAPIKey (translateToSportAPIKey (defineSport (input 2))))
+      (def games (parse-string (getGames sportAPIKey)))
+      (println "Eventos disponiveis:")
+      (dorun (map-indexed (fn [idx game] 
+                            (println (str (+ idx 1) " - " 
+                                          (get game "home_team") " vs " 
+                                          (get game "away_team") " - Data: " 
+                                          (get game "commence_time"))))
+                        games))  ;; Exibe todos os jogos com índice para o usuário escolher
     )
     
-    (= op 3) ;; Opção de Apostar em um evento
+    (= op 4) ;; Opção de Apostar em um evento
     (do
-      (println "Escolha um mercado")
-      (printOptions 3)  ;; Mostra as opções de mercado de aposta (h2h, spreads, totals)
-      (def market (defineMarket (input 3)))  ;; Lê a escolha do mercado
+      (println "Digite o esporte")
+      (printOptions 2)
+      (def sport (defineSport (input 2)))  ;; Lê a escolha do esporte
       (if
-        (number? market) (println "Retornando\n")  ;; Se for número, sai
+        (number? sport) (println "Retornando\n")  ;; Se for número, sai
         (do
-          (println (format "Voce escolheu o mercado %s\n" market))
-          (println "Escolha o evento (digite o numero do evento):")
+
+          (def sportAPIKey (translateToSportAPIKey sport))
+          (def games (parse-string (getGames sportAPIKey)))
+          (println (format "Voce escolheu %s\n" sport))
+
+          (println "Eventos disponiveis:")
+          (dorun (map-indexed (fn [idx game] 
+                                (println (str (+ idx 1) " - " 
+                                              (get game "home_team") " vs " 
+                                              (get game "away_team") " - Data: " 
+                                              (get game "commence_time"))))
+                            games))  ;; Exibe todos os jogos com índice para o usuário escolher
           
-          (printOptions 2)  ;; Mostra as opções de esporte (Futebol ou Basquete)
-          (def sport (defineSport (input 2)))  ;; Lê a escolha do esporte
+          (println "Digite o numero do evento que deseja apostar:")
+          (def event-choice (read))  ;; O usuário escolhe o evento digitando o número
 
+          (println "Escolha um mercado")
+          (printOptions 3)  ;; Mostra as opções de mercado de aposta (h2h, spreads, totals)
+          (def market (defineMarket (input 3)))  ;; Lê a escolha do mercado
+          
           (if 
-            (number? sport) (println "Retornando\n")  ;; Se for número, sai
+            (number? market) (println "Retornando\n")  ;; Se for número, sai
             (do
-              (println (format "Voce escolheu %s\n" sport))
-              (def games (atom (getGamesFromAPI (translateToSportAPIKey sport) market)))  ;; Chama a API para pegar os jogos
-              (println "Eventos disponiveis:")
-              (dorun (map-indexed (fn [idx game] 
-                                    (println (str (+ idx 1) " - " 
-                                                  (get game "home_team") " vs " 
-                                                  (get game "away_team") " - Data: " 
-                                                  (get game "commence_time"))))
-                                @games))  ;; Exibe todos os jogos com índice para o usuário escolher
-
-              (println "Digite o numero do evento que deseja apostar:")
-              (def event-choice (read))  ;; O usuário escolhe o evento digitando o número
-              
+              (println (format "Voce escolheu o mercado %s\n" market))
+              (if (= market "totals") (def games (parse-string (getTotals sportAPIKey))))
               ;; Pega o jogo escolhido baseado no número
-              (def selected-game (nth @games (dec event-choice)))
-              
+              (def selected-game (nth games (dec event-choice)))
               ;; Pega as odds para o mercado
               (def bookmakers (get selected-game "bookmakers"))
               
               ;; Filtro condicional com base no esporte (basquete ou futebol)
-              (def bookmaker-key (if (= sport "Basquete") "draftkings" "bovada"))  ;; "1" pode ser o código para Basquete, por exemplo
-
+              (def bookmaker-key (if (= sport "Basquete") "draftkings" "bovada"))
               (def bookmaker (first (filter #(= bookmaker-key (get % "key")) bookmakers)))  ;; Filtra pelo bookmaker correto
               (def markets (get bookmaker "markets"))
               
@@ -377,6 +260,7 @@
               ;; Verifica se o mercado é "totals"
               (if (= market "totals")
                 (do
+                  ;;(println games)
                   ;; Exibe as opções de "Over" e "Under" com os pontos e odds
                   (println "Escolha o resultado para apostar:")
                   (doall
@@ -414,26 +298,26 @@
               (println "Digite o valor da aposta:")
               (def bet-value (readNumber))  ;; O usuário insere o valor da aposta
                
-              ;; Salva a aposta
-              (saveBet (get selected-game "id") market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd
-                       (get selected-game "home_team") (get selected-game "away_team") selected-point (get selected-game "sport_key"))
+              ;; ;; Salva a aposta
+              (postBet (get selected-game "id") market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd
+                        (get selected-game "home_team") (get selected-game "away_team") selected-point (get selected-game "sport_key"))
                
               ;; Verifica se a aposta foi realmente salva
-              (if (<= bet-value @money)  ;; Verifica se o valor da aposta é suficiente
+              (if (<= bet-value (getBalance))  ;; Verifica se o valor da aposta é suficiente          Vai ser um GET/saldo em JSON
                   (do
                     (println (format "Aposta de %d realizada no evento '%s vs %s' com a odd %.2f." bet-value (get selected-game "home_team") (get selected-game "away_team") selected-odd  ))
-                    (swap! money - bet-value)))
+                    (http-client/post  (str api-host "/transacoes") {:form-params {:value (* -1 bet-value)} :content-type :json})))
             )
           )
         )
       )
     )
     
-    (= op 4) ;; Opção de Ver Apostas
+    (= op 5) ;; Opção de Ver Apostas
       (do
         (println "Exibindo todas as apostas realizadas:")
-        (liquidateBets @bets)
-        (printBets) ;; Chama a função para imprimir as apostas
+        (http-client/get (str api-host "/liquidar"))
+        (printBets)
         (println "Fim da visualizacao de apostas.")
       )
     :else (println "Encerrando o Programa")
