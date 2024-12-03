@@ -7,10 +7,6 @@
 (def basketball "basketball_nba")
 (def api-host "http://localhost:3000")
 
-;; (defn as-json [content]
-;;   {:headers {"Content-Type" "application/json; charset=utf-8"}
-;;    :body (json/generate-string content)})
-
 (defn getBalance[]
   (Integer/parseInt(:body (http-client/get (str api-host "/saldo"))))
 )
@@ -88,6 +84,43 @@
   )
 )
 
+(defn inputRange
+  ([x r]
+    (if
+      (> x (count (range r)))
+        (do
+          (println (format "%d e uma opcao invalida\n" x))
+          (inputRange r)
+        )
+      x
+    )
+  )
+  ([r]
+    (inputRange (read) r)
+  )
+)
+
+(defn inputBet
+  ([x]
+    (cond
+      (> x (getBalance))
+        (do
+          (println (format "%d e maior que o saldo em conta" x))
+          (inputBet)
+        )
+      (< x 0)
+        (do
+          (println "Nao e possivel apostar um valor menor ou igual a 0")
+          (inputBet)
+        )
+      :else x
+    )
+  )
+  ([]
+    (inputBet (read))
+  )
+)
+
 ;;Lê uma entrada até receber um número
 (defn readNumber
   ([x]
@@ -161,8 +194,15 @@
 
 (defn postBet[game-id market selected-outcome bet-value odds home-team away-team selected-point sport-key]
   (http-client/post  (str api-host "/apostas") 
-    {:form-params {:game-id game-id :market market :selected-outcome selected-outcome :bet-value bet-value :odds odds :home-team home-team :away-team away-team :selected-point selected-point :sport-key sport-key} 
-    :content-type :json}
+    {
+      :form-params 
+      {
+        :game-id game-id :market market :selected-outcome selected-outcome 
+        :bet-value bet-value :odds odds :home-team home-team :away-team away-team 
+        :selected-point selected-point :sport-key sport-key
+      } 
+      :content-type :json
+    }
   )
 )
 
@@ -199,15 +239,20 @@
     (do
       (println "Digite o esporte")
       (printOptions 2)
-      (def sportAPIKey (translateToSportAPIKey (defineSport (input 2))))
-      (def games (parse-string (getGames sportAPIKey)))
-      (println "Eventos disponiveis:")
-      (dorun (map-indexed (fn [idx game] 
-                            (println (str (+ idx 1) " - " 
-                                          (get game "home_team") " vs " 
-                                          (get game "away_team") " - Data: " 
-                                          (get game "commence_time"))))
-                        games))  ;; Exibe todos os jogos com índice para o usuário escolher
+      (def value (input 2))
+      (if (= value 0) (println "Retornando")
+        (do
+          (def sportAPIKey (translateToSportAPIKey (defineSport value)))
+          (def games (parse-string (getGames sportAPIKey)))
+          (println "Eventos disponiveis:")
+          (dorun (map-indexed (fn [idx game] 
+                                (println (str (+ idx 1) " - " 
+                                              (get game "home_team") " vs " 
+                                              (get game "away_team") " - Data: " 
+                                              (get game "commence_time"))))
+                            games))  ;; Exibe todos os jogos com índice para o usuário escolher
+        )
+      )
     )
     
     (= op 4) ;; Opção de Apostar em um evento
@@ -231,15 +276,18 @@
                                               (get game "commence_time"))))
                             games))  ;; Exibe todos os jogos com índice para o usuário escolher
           
+          (def market 0)
           (println "Digite o numero do evento que deseja apostar:")
-          (def event-choice (read))  ;; O usuário escolhe o evento digitando o número
-
-          (println "Escolha um mercado")
-          (printOptions 3)  ;; Mostra as opções de mercado de aposta (h2h, spreads, totals)
-          (def market (defineMarket (input 3)))  ;; Lê a escolha do mercado
-          
+          (def event-choice (inputRange (count games)))  ;; O usuário escolhe o evento digitando o número
+          (if (not= event-choice 0)
+            (do
+              (println "Escolha um mercado")
+              (printOptions 3)  ;; Mostra as opções de mercado de aposta (h2h, spreads, totals)
+              (def market (defineMarket (input 3)))  ;; Lê a escolha do mercado
+            )
+          )
           (if 
-            (number? market) (println "Retornando\n")  ;; Se for número, sai
+            (or (number? market)) (println "Retornando") ;; Se for número, sai
             (do
               (println (format "Voce escolheu o mercado %s\n" market))
               (if (= market "totals") (def games (parse-string (getTotals sportAPIKey))))
@@ -271,11 +319,15 @@
                                         (get outcome "price")))) 
                         outcomes))
                   (println "Digite o numero do resultado que deseja apostar:")
-                  (def selected-outcome (read))  ;; Usuário escolhe o resultado
-
-                  ;; Encontrar a odd correspondente ao resultado escolhido
-                  (def selected-odd (get (nth outcomes (dec selected-outcome)) "price"))
-                  (def selected-point (get (nth outcomes (dec selected-outcome)) "point"))
+                  (def selected-outcome (inputRange (count outcomes)))  ;; Usuário escolhe o resultado
+                  (if (= selected-outcome 0)
+                      (println "Retornando")
+                      (do
+                        ;; Encontrar a odd correspondente ao resultado escolhido
+                        (def selected-odd (get (nth outcomes (dec selected-outcome)) "price"))
+                        (def selected-point (get (nth outcomes (dec selected-outcome)) "point"))
+                      )
+                  )
                 )
                 (do
                   ;; Caso o mercado não seja "totals", você pode manter o código anterior para "h2h"
@@ -287,26 +339,36 @@
                                         (get outcome "price")))) 
                         outcomes))
                   (println "Digite o numero do resultado que deseja apostar:")
-                  (def selected-outcome (read))  ;; Usuário escolhe o resultado
-
-                  ;; Encontrar a odd correspondente ao resultado escolhido
-                  (def selected-odd (get (nth outcomes (dec selected-outcome)) "price"))
-                  (def selected-point "")
+                  (def selected-outcome (inputRange (count outcomes)))  ;; Usuário escolhe o resultado
+                  (if (= selected-outcome 0)
+                      (println "Retornando")
+                      (do
+                        ;; Encontrar a odd correspondente ao resultado escolhido
+                        (def selected-odd (get (nth outcomes (dec selected-outcome)) "price"))
+                        (def selected-point "")
+                      )
+                  )
                 )
               )
-              ;; Pergunta o valor da aposta
-              (println "Digite o valor da aposta:")
-              (def bet-value (readNumber))  ;; O usuário insere o valor da aposta
-               
-              ;; ;; Salva a aposta
-              (postBet (get selected-game "id") market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd
-                        (get selected-game "home_team") (get selected-game "away_team") selected-point (get selected-game "sport_key"))
-               
-              ;; Verifica se a aposta foi realmente salva
-              (if (<= bet-value (getBalance))  ;; Verifica se o valor da aposta é suficiente          Vai ser um GET/saldo em JSON
-                  (do
-                    (println (format "Aposta de %d realizada no evento '%s vs %s' com a odd %.2f." bet-value (get selected-game "home_team") (get selected-game "away_team") selected-odd  ))
-                    (http-client/post  (str api-host "/transacoes") {:form-params {:value (* -1 bet-value)} :content-type :json})))
+              (if (not= selected-outcome 0)
+                (do
+                  ;; Pergunta o valor da aposta
+                  (println "Digite o valor da aposta:")
+                  (def bet-value (inputBet))  ;; O usuário insere o valor da aposta
+                  
+                  ;; Verifica se a aposta foi realmente salva
+                  (if (not= bet-value 0)  ;; Verifica se o valor da aposta é suficiente          Vai ser um GET/saldo em JSON
+                      (do
+                        ;; Salva a aposta
+                        (postBet (get selected-game "id") market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd
+                                  (get selected-game "home_team") (get selected-game "away_team") selected-point (get selected-game "sport_key"))
+                        (println (format "Aposta de %d realizada no evento '%s vs %s' com a odd %.2f." bet-value (get selected-game "home_team") (get selected-game "away_team") selected-odd  ))
+                        (http-client/post  (str api-host "/transacoes") {:form-params {:value (* -1 bet-value)} :content-type :json})
+                      )
+                      (println "Retornando")
+                  )
+                )
+              )
             )
           )
         )
