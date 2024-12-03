@@ -9,6 +9,7 @@
                   [ring/ring-defaults	"0.3.2"]
                   [ring/ring-json	"0.4.0"]
                   [clj-http	"3.9.1"]
+                  [ring-cors/ring-cors "0.1.13"]
                 ]
   :plugins [[lein-ring "0.12.5"]]
   :main ^:skip-aot sportgamble.core
