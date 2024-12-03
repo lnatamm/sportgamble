@@ -43,45 +43,48 @@
   (def game (getGame sportAPIKey eventId))
   (def selectedPoint (:selected-point bet))
   
-    (if (and (not (= winner "incomplete")) (= betStatus "Pendente"))
-      (do
-        (def team1Score (Integer/parseInt (get (nth (get game "scores") 0) "score")))
-        (def team2Score (Integer/parseInt (get (nth (get game "scores") 1) "score")))
-        (def totals (+ team1Score team2Score))
+  (if (and (not (= winner "incomplete")) (= betStatus "Pendente"))
+    (do
+      (def team1Score (Integer/parseInt (get (nth (get game "scores") 0) "score")))
+      (def team2Score (Integer/parseInt (get (nth (get game "scores") 1) "score")))
+      (def totals (+ team1Score team2Score))
+      (cond
+        (= market "h2h") 
+        (if 
+          (= winner betOutcome)
+            (do
+              (println "Aposta vencedora no mercado h2h!")
+              (updateBetStatus eventId "Ganhou")
+              (http-client/post (str api-host "/transacoes") {:form-params {:value (* betOdd betValue)} :content-type :json})
+            )
+          (updateBetStatus eventId "Perdeu")
+        )
+        (= market "totals")
         (cond
-          (= market "h2h") 
-          (if 
-            (= winner betOutcome)
+          (= betOutcome "Over")
+          (if
+            (> totals selectedPoint)
               (do
-                (println "Aposta vencedora no mercado h2h!")
+                (println "Aposta vencedora no mercado totals (Over)!")
                 (updateBetStatus eventId "Ganhou")
                 (http-client/post (str api-host "/transacoes") {:form-params {:value (* betOdd betValue)} :content-type :json})
               )
             (updateBetStatus eventId "Perdeu")
           )
-          (= market "totals")
-          (cond
-            (= betOutcome "Over")
-            (if
-              (> totals selectedPoint)
-                (do
-                  (println "Aposta vencedora no mercado totals (Over)!")
-                  (updateBetStatus eventId "Ganhou")
-                  (http-client/post (str api-host "/transacoes") {:form-params {:value (* betOdd betValue)} :content-type :json})
-                )
-              (updateBetStatus eventId "Perdeu")
-            )
-            (= betOutcome "Under")
-            (if 
-              (< totals selectedPoint)
-                (do
-                  (println "Aposta vencedora no mercado totals (Under)!")
-                  (updateBetStatus eventId "Ganhou")
-                  (http-client/post (str api-host "/transacoes") {:form-params {:value (* betOdd betValue)} :content-type :json})
-                )
-              (updateBetStatus eventId "Perdeu")
-            ))))
-            )
+          (= betOutcome "Under")
+          (if 
+            (< totals selectedPoint)
+              (do
+                (println "Aposta vencedora no mercado totals (Under)!")
+                (updateBetStatus eventId "Ganhou")
+                (http-client/post (str api-host "/transacoes") {:form-params {:value (* betOdd betValue)} :content-type :json})
+              )
+            (updateBetStatus eventId "Perdeu")
+          )
+        )
+      )
+    )
+  )
 )
 
 
@@ -92,19 +95,15 @@
 
 ;;Função para salvar uma aposta no átomo
 (defn saveBet [request]
-  ;;(if (<= bet-value @money)  ;; Verifica se o valor da aposta é menor ou igual ao saldo
-    (do
-      ;; Salva a aposta incluindo as informações das equipes
-      (swap! bets conj {:game-id (:game-id request)
-                        :market (:market request)
-                        :selected-outcome (:selected-outcome request)
-                        :bet-value (:bet-value request)
-                        :odds (:odds request)
-                        :home_team (:home-team request)  ;; Adiciona o time da casa
-                        :away_team (:away-team request)  ;; Adiciona o time visitante
-                        :selected-point (:selected-point request)
-                        :sport-key (:sport-key request)
-                        :status "Pendente"})  ;; Status inicial da aposta como "pendente"
-    )
-  ;;)
+  ;; Salva a aposta incluindo as informações das equipes
+  (swap! bets conj {:game-id (:game-id request)
+                    :market (:market request)
+                    :selected-outcome (:selected-outcome request)
+                    :bet-value (:bet-value request)
+                    :odds (:odds request)
+                    :home_team (:home-team request)  ;; Adiciona o time da casa
+                    :away_team (:away-team request)  ;; Adiciona o time visitante
+                    :selected-point (:selected-point request)
+                    :sport-key (:sport-key request)
+                    :status "Pendente"})  ;; Status inicial da aposta como "pendente"
 )
