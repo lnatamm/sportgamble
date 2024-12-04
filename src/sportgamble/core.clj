@@ -3,12 +3,15 @@
   (:require	[clj-http.client	:as	http-client])
   (:gen-class))
 
-(def soccer "americanfootball_nfl")
+(def soccer "soccer_epl")
 (def basketball "basketball_nba")
 (def api-host "http://localhost:3000")
 
+(def bet-id (atom 0))
+
+
 (defn getBalance[]
-  (Integer/parseInt(:body (http-client/get (str api-host "/saldo"))))
+  (Double/parseDouble (:body (http-client/get (str api-host "/saldo"))))
 )
 
 (defn getBets[]
@@ -193,11 +196,12 @@
 )
 
 (defn postBet[game-id market selected-outcome bet-value odds home-team away-team selected-point sport-key]
+  (swap! bet-id inc)
   (http-client/post  (str api-host "/apostas") 
     {
       :form-params 
       {
-        :game-id game-id :market market :selected-outcome selected-outcome 
+        :bet-id @bet-id :game-id game-id :market market :selected-outcome selected-outcome 
         :bet-value bet-value :odds odds :home-team home-team :away-team away-team 
         :selected-point selected-point :sport-key sport-key
       } 

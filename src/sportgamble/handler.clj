@@ -12,7 +12,7 @@
 
 (def api-host "https://api.the-odds-api.com")
 
-(def apiKey "e89035ce2ff24af8e6d1be59aea9821a")
+(def apiKey "9eb56abab1884a80d79087748edf337f")
 
 (defn as-json [content]
   {:headers {"Content-Type" "application/json; charset=utf-8"}
@@ -41,6 +41,13 @@
   )
 )
 
+(defn defineTotals [team1 team2]
+  (def team1Score (Integer/parseInt (get team1 "score")))
+  (def team2Score (Integer/parseInt (get team2 "score")))
+  (str (+ team1Score team2Score))
+)
+
+
 ;;Retorna o resultado de um jogo caso o mesmo esteja completo
 (defn getGameResultFromAPI[sportAPIKey eventId]
   (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s&eventIds=%s&daysFrom=3" api-host sportAPIKey apiKey eventId))
@@ -55,8 +62,15 @@
 
 (defn getGameFromAPI[sportAPIKey eventId]
   (def requisition (format "%s/v4/sports/%s/scores/?apiKey=%s&eventIds=%s&daysFrom=3" api-host sportAPIKey apiKey eventId))
-  (parse-string (:body (http/get requisition)))
+  (def game (nth (parse-string (:body (http/get requisition))) 0))
+  (if 
+    (not (get game "completed")) "incomplete"
+    (do
+      (defineTotals (nth (get game "scores") 0) (nth (get game "scores") 1))
+    )
+  )
 )
+
 
 (defroutes app-routes
   (GET "/" [] "Hello World")
@@ -68,7 +82,7 @@
   (POST "/apostas" request (-> (betsdb/saveBet (:body request)) (as-json)))
   (GET "/apostas" [] (-> (betsdb/getBets) (as-json)))
   (GET "/resultados" [sportAPIKey eventId] (getGameResultFromAPI sportAPIKey eventId))
-  (GET "/jogo" [sportAPIKey eventId] (getGameFromAPI sportAPIKey eventId))
+  (GET "/totalsResult" [sportAPIKey eventId] (getGameFromAPI sportAPIKey eventId))
   (GET "/liquidar" [] (do (betsdb/liquidateBets) (http/get "http://localhost:3000/apostas")))
   (route/not-found "Not Found"))
 

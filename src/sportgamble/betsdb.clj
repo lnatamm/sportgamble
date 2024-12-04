@@ -15,16 +15,16 @@
 (defn getResult [sportAPIKey eventId]
   (:body (http-client/get (str api-host (format "/resultados?sportAPIKey=%s&eventId=%s" sportAPIKey eventId))))
 )
-(defn getGame [sportAPIKey eventId]
-  (:body (http-client/get (str api-host (format "/jogo?sportAPIKey=%s&eventId=%s" sportAPIKey eventId))))
+(defn getTotals [sportAPIKey eventId]
+  (:body (http-client/get (str api-host (format "/totalsResult?sportAPIKey=%s&eventId=%s" sportAPIKey eventId))))
 )
 
 ;;Atualiza o status da bet
-(defn updateBetStatus [game-id status]
+(defn updateBetStatus [bet-id status]
   (swap! bets 
     (fn[bets] 
       (doall 
-        (map (fn[bet] (if (= (:game-id bet) game-id) (assoc bet :status status) bet)) bets)
+        (map (fn[bet] (if (= (:bet-id bet) bet-id) (assoc bet :status status) bet)) bets)
       )
     )
   )
@@ -40,24 +40,24 @@
   (def betStatus (get bet :status))
   (def market (get bet :market))
   (def winner (getResult sportAPIKey eventId))
-  (def game (getGame sportAPIKey eventId))
   (def selectedPoint (:selected-point bet))
-  
+  (def bet-id (get bet :bet-id))
+  (if (and (not (= winner "incomplete")) (= betStatus "Pendente"))
+    (def totals (Integer/parseInt(getTotals sportAPIKey eventId)))
+  )
+
   (if (and (not (= winner "incomplete")) (= betStatus "Pendente"))
     (do
-      (def team1Score (Integer/parseInt (get (nth (get game "scores") 0) "score")))
-      (def team2Score (Integer/parseInt (get (nth (get game "scores") 1) "score")))
-      (def totals (+ team1Score team2Score))
       (cond
         (= market "h2h") 
         (if 
           (= winner betOutcome)
             (do
               (println "Aposta vencedora no mercado h2h!")
-              (updateBetStatus eventId "Ganhou")
+              (updateBetStatus bet-id "Ganhou")
               (http-client/post (str api-host "/transacoes") {:form-params {:value (* betOdd betValue)} :content-type :json})
             )
-          (updateBetStatus eventId "Perdeu")
+          (updateBetStatus bet-id "Perdeu")
         )
         (= market "totals")
         (cond
@@ -66,20 +66,20 @@
             (> totals selectedPoint)
               (do
                 (println "Aposta vencedora no mercado totals (Over)!")
-                (updateBetStatus eventId "Ganhou")
+                (updateBetStatus bet-id "Ganhou")
                 (http-client/post (str api-host "/transacoes") {:form-params {:value (* betOdd betValue)} :content-type :json})
               )
-            (updateBetStatus eventId "Perdeu")
+            (updateBetStatus bet-id "Perdeu")
           )
           (= betOutcome "Under")
           (if 
             (< totals selectedPoint)
               (do
                 (println "Aposta vencedora no mercado totals (Under)!")
-                (updateBetStatus eventId "Ganhou")
+                (updateBetStatus bet-id "Ganhou")
                 (http-client/post (str api-host "/transacoes") {:form-params {:value (* betOdd betValue)} :content-type :json})
               )
-            (updateBetStatus eventId "Perdeu")
+            (updateBetStatus bet-id "Perdeu")
           )
         )
       )
@@ -96,7 +96,8 @@
 ;;Função para salvar uma aposta no átomo
 (defn saveBet [request]
   ;; Salva a aposta incluindo as informações das equipes
-  (swap! bets conj {:game-id (:game-id request)
+  (swap! bets conj {:bet-id (:bet-id request)
+                    :game-id (:game-id request)
                     :market (:market request)
                     :selected-outcome (:selected-outcome request)
                     :bet-value (:bet-value request)
