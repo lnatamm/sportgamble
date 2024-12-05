@@ -1,19 +1,26 @@
-# sportgamble
+# Sportgamble
 
-FIXME
+Aplicativo simulador de apostas esportivas desenvolvido na disciplina de Programação Funcional na UNIFOR.  
 
-## Prerequisites
+## Disclaimer
 
-You will need [Leiningen][] 2.0.0 or above installed.
+Esse aplicativo é apenas para diversão, não utilizando dinheiro real para prática de apostas ou jogos de azar.
+
+## Pré Requisitos
+
+Você vai precisar do [Leiningen][] 2.0.0 ou acima instalado.
 
 [leiningen]: https://github.com/technomancy/leiningen
 
 ## Running
 
-To start a web server for the application, run:
+Primeiro inicie o servidor da API executando o seguinte comando:
 
     lein ring server
+ou se não quiser abrir uma aba do navegador:
 
-## License
+    lein ring server-headless
 
-Copyright © 2024 FIXME
+Depois execute o comando:
+
+    lein run
