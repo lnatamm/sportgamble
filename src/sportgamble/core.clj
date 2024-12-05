@@ -32,7 +32,7 @@
   (cond
     (= op 1)
       (do
-        (println "Seu saldo atual e" (getBalance))
+        (println "Seu saldo atual e" (format "%.2f" (getBalance)))
         (println "1 - Depositar")
         (println "2 - Sacar")
         (println "3 - Consultar Eventos")
@@ -108,7 +108,7 @@
     (cond
       (> x (getBalance))
         (do
-          (println (format "%d e maior que o saldo em conta" x))
+          (println (format "%s e maior que o saldo em conta" x))
           (inputBet)
         )
       (< x 0)
@@ -218,7 +218,7 @@
         (println "Insira o valor a ser sacado")
         (withdrawl (readNumber))
       )
-    :else (do (http-client/post  (str api-host "/transacoes") {:form-params {:value (* -1 amount)} :content-type :json}) (println (format "Saque de %d realizado com sucesso!" amount)))
+    :else (do (http-client/post  (str api-host "/transacoes") {:form-params {:value (* -1 amount)} :content-type :json}) (println (format "Saque de %s realizado com sucesso!" amount)))
   )
 )
 
@@ -229,7 +229,7 @@
       (println "Digite o valor para depositar:")
       (def amount (readNumber))
       (deposit amount)
-      (println (format "Deposito de %d realizado com sucesso!" amount))
+      (println (format "Deposito de %s realizado com sucesso!" amount))
     )
 
     (= op 2) ;; Opção de Sacar
@@ -366,7 +366,7 @@
                         ;; Salva a aposta
                         (postBet (get selected-game "id") market (get (nth outcomes (dec selected-outcome)) "name") bet-value selected-odd
                                   (get selected-game "home_team") (get selected-game "away_team") selected-point (get selected-game "sport_key"))
-                        (println (format "Aposta de %d realizada no evento '%s vs %s' com a odd %.2f." bet-value (get selected-game "home_team") (get selected-game "away_team") selected-odd  ))
+                        (println (format "Aposta de %s realizada no evento '%s vs %s' com a odd %.2f." bet-value (get selected-game "home_team") (get selected-game "away_team") selected-odd  ))
                         (http-client/post  (str api-host "/transacoes") {:form-params {:value (* -1 bet-value)} :content-type :json})
                       )
                       (println "Retornando")
